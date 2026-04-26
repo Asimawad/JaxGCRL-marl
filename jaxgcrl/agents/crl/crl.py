@@ -233,13 +233,15 @@ class CRL:
         train_env.step = jax.jit(train_env.step)
 
         # Dimensions definitions and sanity checks
-        action_size = train_env.action_size
-        state_size = train_env.state_dim
+        action_size = int(train_env.action_size)
+        state_size = int(train_env.state_dim)
         goal_size = len(train_env.goal_indices)
         obs_size = state_size + goal_size
         assert obs_size == train_env.observation_size, (
             f"obs_size: {obs_size}, observation_size: {train_env.observation_size}"
         )
+        # Pure-Python buffer_config so it's hashable as a JIT static arg
+        _buffer_config = (float(self.discounting), state_size, tuple(int(i) for i in train_env.goal_indices))
 
         # Network setup
         # Actor
@@ -468,7 +470,7 @@ class CRL:
             # process transitions for training
             batch_keys = jax.random.split(sampling_key, transitions.observation.shape[0])
             transitions = jax.vmap(flatten_batch, in_axes=(None, 0, 0))(
-                (self.discounting, state_size, tuple(train_env.goal_indices)),
+                _buffer_config,
                 transitions,
                 batch_keys,
             )
@@ -597,7 +599,11 @@ class CRL:
                 save_params(path, params)
 
         total_steps = current_step
-        assert total_steps >= config.total_env_steps
+        params = (
+            training_state.alpha_state.params,
+            training_state.actor_state.params,
+            training_state.critic_state.params,
+        )
 
         logging.info("total steps: %s", total_steps)
 
