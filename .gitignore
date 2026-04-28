@@ -1,0 +1,48 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+
+# --- Virtualenvs ---
+.venv/
+venv/
+env/
+
+# --- Local outputs / logs ---
+wandb/
+runs/
+logs/
+*.log
+checkpoints/
+
+# --- Bundled archives ---
+cppo.zip
+*.tar.gz
+*.zip
+
+# --- Mava clones / vendored code (kept locally for reference, not pushed) ---
+mava/
+cppo-code/
+
+# --- Dev artefacts that snuck into the work area ---
+example.py
+Screenshot*.png
+
+# --- Secrets / local config ---
+.env
+.env.*
+!.env.example
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# --- JAX cache ---
+.jax_cache/

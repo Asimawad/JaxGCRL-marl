@@ -1,0 +1,91 @@
+# wandb sweep config for CPPO on ant_u_maze.
+# Goal: find stable >0.4 (CRL is ~0.40 on this env).
+#
+# Usage:
+#   wandb sweep --project cppo-aum ./scripts/sweep_cppo.yml
+#   wandb agent <output_id>           # one agent = one trial
+#   wandb agent --count 30 <output_id>  # cap trials
+
+program: run.py
+method: bayes
+metric:
+  goal: maximize
+  name: eval/episode_success_any
+
+# Bayes optimizer + hyperband to kill bad runs at 5M / 10M / 15M.
+early_terminate:
+  type: hyperband
+  min_iter: 10
+  eta: 2
+
+parameters:
+  # ── Stabilization knobs ────────────────────────────────────────
+  target_entropy:
+    distribution: uniform
+    min: 1.5
+    max: 5.0
+  log_std_max:
+    values: [-1.0, -0.5, 0.0]
+  clip_eps:
+    values: [0.05, 0.10, 0.15, 0.20]
+  actor_lr:
+    values: [1.0e-4, 3.0e-4]
+  q_lr:
+    values: [1.0e-4, 3.0e-4]
+  ent_coef:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.05
+
+  # ── CRL knobs ───────────────────────────────────────────────────
+  contrastive_loss_fn:
+    values: [fwd_infonce, bwd_infonce, sym_infonce]
+  energy_fn:
+    values: [dot, norm]
+  contrastive_temperature:
+    values: [1.0, 2.5, 5.0]
+
+  # ── Architecture / data ─────────────────────────────────────────
+  rollout_length:
+    values: [128, 256]
+  num_mc_samples:
+    values: [16, 32, 64]
+  skip_connections:
+    values: [0, 4]
+
+  # ── Seed ─────────────────────────────────────────────────────────
+  seed:
+    distribution: int_uniform
+    min: 0
+    max: 1000
+
+# Fixed args (not swept).
+command:
+  - ${env}
+  - python
+  - ${program}
+  - "--env=ant_u_maze"
+  - "--total-env-steps=20000000"
+  - "--num-envs=256"
+  - "--episode-length=1001"
+  - "--num-evals=40"
+  - "--exp-name=cppo-aum-sweep"
+  - "--no-log-wandb"   # comment out to log to wandb (paired with `wandb sweep`)
+  - "cppo"
+  - "--batch-size=256"
+  - "--num-epochs=8"
+  - "--discounting=0.9999"
+  - "--logsumexp-penalty-coeff=0.1"
+  - "--max-grad-norm=1.0"
+  - "--log-std-min=-5.0"
+  - "--h-dim=512"
+  - "--n-hidden=4"
+  - "--use-layer-norm"
+  - "--use-achieved-goal"
+  - "--use-adaptive-entropy"
+  - "--alpha-lr=3e-4"
+  - "--log-alpha-clip-min=0.0001"
+  - "--log-alpha-clip-max=0.1"
+  - "--sa-state-mode=state_only"
+  - "--actor-input-mode=obs_full_ach"
+  - ${args}

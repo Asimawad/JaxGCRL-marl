@@ -1,0 +1,27 @@
+apiVersion: 0.2.2
+builder:
+  context: .
+  dockerfile: Dockerfile
+  image: registry.aichor-dataplane-prod.eqx.ext.id-baremetal.net/int-research-c00141b6503a4bd4/image:2e66d39a-40c9-4d95-a5c7-6e70696010cc
+kind: AIchorManifest
+spec:
+  command: ./run.sh
+  debug:
+    vscode:
+      enabled: true
+      path: /aichor/code
+      provider: github
+  image: registry.aichor-dataplane-prod.eqx.ext.id-baremetal.net/int-research-c00141b6503a4bd4/image:2e66d39a-40c9-4d95-a5c7-6e70696010cc
+  operator: jax
+  types:
+    worker:
+      count: 1
+      resources:
+        accelerators:
+          gpu:
+            count: 1
+            product: NVIDIA-H100-80GB-HBM3
+            type: gpu
+        cpuLimitRatio: 2
+        cpus: 4
+        ramRatio: 20

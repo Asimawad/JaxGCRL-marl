@@ -1,0 +1,46 @@
+# Heavy dirs / build artifacts excluded from docker build context.
+.venv
+mava/.venv
+docs/JaxGCRL/.venv
+
+# Local logs / runs / cached data
+logs
+runs
+wandb
+multirun
+outputs
+checkpoints
+results
+
+# Mava experiment artifacts (kept as code under mava/, but skip outputs)
+mava/multirun
+mava/outputs
+mava/checkpoints
+mava/results
+mava/wandb
+mava/runs
+
+# Git / VCS
+.git
+.gitignore
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode
+
+# Old conda dockerfile (replaced by ./Dockerfile)
+dockerfile
+
+# Misc upstream artifacts
+imgs
+docs/imgs
+renders
+notebooks
+=3.1.3,
