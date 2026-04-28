@@ -46,11 +46,16 @@ loggers:
     # Map JaxGCRL metric keys → marl-eval-compatible keys. The keys on the
     # left are what the agent emits (after stripping the `eval/` prefix);
     # the values on the right are what gets written to metrics.json.
+    #
+    # `episode_success_any` is the JaxGCRL-paper success metric (0–1 fraction
+    # of episodes where the goal was reached). It's the headline number — keep
+    # the `_any` in the JSON key so it's not confused with `episode_success`
+    # (which is the per-episode count of in-goal steps, a different scale).
     metrics_to_log:
+      episode_success_any: mean_episode_success_any
       episode_reward: mean_episode_return
-      episode_success_any: mean_episode_success
-      episode_success: mean_episode_success_count
       sps: steps_per_second
+      avg_episode_length: mean_episode_length
 
   tensorboard:
     _target_: mava.utils.logger.TensorboardLogger
