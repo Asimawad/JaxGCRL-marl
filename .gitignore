@@ -10,7 +10,10 @@ dist/
 # --- Virtualenvs ---
 .venv/
 venv/
-env/
+# Anchor to repo root: the bare `env/` pattern was a footgun — it also swallowed
+# `mava/configs/jaxgcrl/env/` (the hydra env config dir) for weeks before it
+# was caught. Only ignore an `env/` directory at the repo root.
+/env/
 
 # --- Local outputs / logs ---
 wandb/

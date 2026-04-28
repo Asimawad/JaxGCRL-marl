@@ -1,0 +1,4 @@
+# pusher_hard requires the mjx backend (default backend hangs in JIT)
+env_name: pusher_hard
+backend: mjx
+eval_env: null
