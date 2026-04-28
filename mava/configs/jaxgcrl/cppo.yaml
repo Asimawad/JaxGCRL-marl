@@ -1,28 +1,30 @@
 # Top-level config for the mava-hosted JaxGCRL CPPO agent.
 #
-# Run via:
-#   python -m mava.jaxgcrl.run                         # uses defaults below
-#   python -m mava.jaxgcrl.run env=humanoid            # swap env
-#   python -m mava.jaxgcrl.run system.actor_lr=1e-4    # override hyperparam
-#   python -m mava.jaxgcrl.run -m system.actor_lr=1e-4,3e-4,1e-3   # multirun
+# Modes (matches Mava's ff_icrl convention — every run is a multirun, n_trials
+# controls how many trials):
+#
+#   python -m mava.jaxgcrl.run                                # 20-trial optuna sweep on ant
+#   python -m mava.jaxgcrl.run env=humanoid                   # 20-trial sweep on humanoid
+#   python -m mava.jaxgcrl.run hydra.sweeper.n_trials=1       # single trial (smoke test)
+#   python -m mava.jaxgcrl.run hydra.sweeper.n_trials=100     # bigger sweep
+#   python -m mava.jaxgcrl.run system.actor_lr=1e-4           # override one knob, sweep the rest
+#
+# Multi-seed (override seeds explicitly, search-space still active):
+#   python -m mava.jaxgcrl.run hydra.sweeper.n_trials=3 run.seed=0,1,2
 
 defaults:
   - logger: logger
   - system: cppo
   - env: ant
+  - search_space@hydra.sweeper.params: cppo
+  - override hydra/sweeper: optuna
+  - override hydra/sweeper/sampler: tpe
   - _self_
-  # For sweeps, opt in on the CLI:
-  #   python -m mava.jaxgcrl.run -m \
-  #       'hydra/sweeper=optuna' \
-  #       '+search_space@hydra.sweeper.params=cppo' \
-  #       hydra.sweeper.n_trials=20
 
 # Which agent class `mava/jaxgcrl/run.py` should construct.
-# Must be one of: cppo, crl. Determines which `system/*.yaml` is valid.
 agent: cppo
 
 # Run-level args fed to the agent's `train_fn(config: RunConfig, ...)`.
-# These mirror `mava.jaxgcrl.utils.config.RunConfig` field names.
 run:
   seed: 0
   total_env_steps: 50_000_000
@@ -34,7 +36,6 @@ run:
   cuda: true
   max_devices_per_host: 1
 
-  # Experiment naming + wandb (consumed by MavaLogger via the logger config below).
   exp_name: cppo_${env.env_name}_seed${run.seed}_${now:%Y-%m-%d}
   log_wandb: true
   wandb_project_name: cppo-brax
@@ -45,11 +46,16 @@ run:
   vis_length: 1000
   checkpoint_logdir: null
 
-# Sweep example (run on CLI, not stored here, since these keys only exist
-# when hydra/sweeper=optuna is selected):
-#   python -m mava.jaxgcrl.run -m \
-#       'hydra/sweeper=optuna' \
-#       '+search_space@hydra.sweeper.params=cppo' \
-#       hydra.sweeper.direction=maximize \
-#       hydra.sweeper.n_trials=20 \
-#       hydra.sweeper.sampler.seed=42
+# Optuna sweep config — active when `python -m mava.jaxgcrl.run` (multirun is
+# always on via `mode: MULTIRUN` below). `hydra.sweeper.params` is loaded from
+# `search_space/cppo.yaml` via the defaults entry above.
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    sampler:
+      seed: 42
+    direction: maximize
+    study_name: cppo-${env.env_name}
+    storage: null
+    n_trials: 20
+    n_jobs: 1

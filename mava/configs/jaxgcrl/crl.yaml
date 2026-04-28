@@ -1,15 +1,14 @@
 # Top-level config for the mava-hosted JaxGCRL CRL agent (paper baseline).
+# Same multirun-by-default convention as cppo.yaml — see that file for details.
 
 defaults:
   - logger: logger
   - system: crl
   - env: ant
+  - search_space@hydra.sweeper.params: crl
+  - override hydra/sweeper: optuna
+  - override hydra/sweeper/sampler: tpe
   - _self_
-  # For sweeps, opt in on the CLI:
-  #   python -m mava.jaxgcrl.run --config-name=crl -m \
-  #       'hydra/sweeper=optuna' \
-  #       '+search_space@hydra.sweeper.params=crl' \
-  #       hydra.sweeper.n_trials=20
 
 agent: crl
 
@@ -34,4 +33,13 @@ run:
   vis_length: 1000
   checkpoint_logdir: null
 
-# See cppo.yaml for the equivalent sweep CLI example (use `--config-name=crl`).
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    sampler:
+      seed: 42
+    direction: maximize
+    study_name: crl-${env.env_name}
+    storage: null
+    n_trials: 20
+    n_jobs: 1
