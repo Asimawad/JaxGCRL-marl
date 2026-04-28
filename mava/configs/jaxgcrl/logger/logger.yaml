@@ -36,12 +36,21 @@ loggers:
     run_id: ~
 
   json:
-    _target_: mava.utils.logger.JsonLogger
-    enabled: False
+    # marl-eval-compatible JSON writer.
+    # Path defaults to `results/json/<env_name>/` (one file per env, all seeds
+    # and algos share it because the file structure nests by env→task→algo→seed).
+    enabled: True
     path: ~
     task_name: ${env.env_name}
     env_name: ${env.env_name}
-    seed: ${run.seed}
+    # Map JaxGCRL metric keys → marl-eval-compatible keys. The keys on the
+    # left are what the agent emits (after stripping the `eval/` prefix);
+    # the values on the right are what gets written to metrics.json.
+    metrics_to_log:
+      episode_reward: mean_episode_return
+      episode_success_any: mean_episode_success
+      episode_success: mean_episode_success_count
+      sps: steps_per_second
 
   tensorboard:
     _target_: mava.utils.logger.TensorboardLogger

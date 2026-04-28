@@ -18,6 +18,7 @@ runs/
 logs/
 outputs/
 multirun/
+results/
 *.log
 checkpoints/
 

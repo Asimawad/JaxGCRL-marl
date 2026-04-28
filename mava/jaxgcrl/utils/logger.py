@@ -1,10 +1,14 @@
 """Mava-compatible logger for the JaxGCRL port — without the heavy Mava deps.
 
-Mava's `mava.utils.logger` pulls in jumanji, tensorflow_probability, marl_eval,
-neptune, tensorboard_logger, etc. The JaxGCRL agents don't need any of that —
-we only need ConsoleLogger and WandbLogger. This module replicates the public
-API of `mava.utils.logger` (LogEvent, MavaLogger, log_config, log, stop) so the
-hydra entry point can use it as a drop-in replacement.
+Mava's `mava.utils.logger` pulls in jumanji, tensorflow_probability, neptune,
+tensorboard_logger, etc. The JaxGCRL agents only need a subset. This module
+replicates the public API of `mava.utils.logger` (`LogEvent`, `MavaLogger`,
+`log_config`, `log`, `stop`) and ships three backends:
+
+  - ConsoleLogger — coloured single-line-per-event output (matches Mava format)
+  - WandbLogger   — `wandb.init / wandb.log` per LogEvent
+  - JsonLogger    — wraps `marl_eval.json_tools.JsonLogger` so the resulting
+                    `metrics.json` plays with marl-eval's plotting tools.
 
 Public surface:
     LogEvent          enum of {ACT, TRAIN, EVAL, ABSOLUTE, MISC}
@@ -150,6 +154,66 @@ class _WandbLogger:
             pass
 
 
+class _JsonLogger:
+    """marl-eval-compatible JSON writer (env→task→algo→seed_N→step_M tree).
+
+    Wraps `marl_eval.json_tools.JsonLogger`. Writes ONLY on `LogEvent.EVAL`
+    and `LogEvent.ABSOLUTE`. Filters incoming metrics through a key allowlist
+    (with optional rename) defined in YAML — usually mapping JaxGCRL's
+    `episode_reward` → marl-eval's `mean_episode_return` so plotters work.
+    """
+
+    def __init__(self, cfg) -> None:
+        from marl_eval.json_tools import JsonLogger as _MELJsonLogger
+
+        json_cfg = cfg.logger.loggers.json
+        run = cfg.run
+
+        path = json_cfg.get("path", None) or f"results/json/{cfg.env.env_name}"
+        task_name = json_cfg.get("task_name", None) or cfg.env.env_name
+        env_name = json_cfg.get("env_name", None) or cfg.env.env_name
+        algo = cfg.get("agent", "agent")
+        seed = int(run.seed)
+
+        self._logger = _MELJsonLogger(
+            path=path,
+            algorithm_name=algo,
+            task_name=task_name,
+            environment_name=env_name,
+            seed=seed,
+        )
+
+        # Allowlist: dict mapping incoming key -> json-output key (or None to keep).
+        # Defaults match marl-eval plotting conventions.
+        default_map = {
+            "episode_reward": "mean_episode_return",
+            "episode_success_any": "mean_episode_success",
+            "sps": "steps_per_second",
+        }
+        user_map = json_cfg.get("metrics_to_log", None)
+        self._key_map: Dict[str, str] = (
+            dict(user_map) if user_map else default_map
+        )
+
+    def log_dict(self, data: Dict[str, Any], step: int, eval_step: int, event: LogEvent) -> None:
+        if event not in (LogEvent.EVAL, LogEvent.ABSOLUTE):
+            return
+        is_absolute = event == LogEvent.ABSOLUTE
+        for k_in, k_out in self._key_map.items():
+            if k_in not in data:
+                continue
+            v = _to_scalar(data[k_in])
+            if not isinstance(v, (int, float)):
+                continue
+            self._logger.write(int(step), k_out, float(v), eval_step, is_absolute)
+
+    def log_config(self, _cfg: Dict[str, Any]) -> None:
+        return None
+
+    def stop(self) -> None:
+        return None  # marl_eval.JsonLogger flushes on every write
+
+
 class MavaLogger:
     """Mava-compatible logger that fans out to enabled backends.
 
@@ -170,6 +234,11 @@ class MavaLogger:
                 self.backends.append(_WandbLogger(cfg))
             except Exception as e:  # missing wandb api key, network down, etc.
                 logging.warning("WandbLogger disabled: %s", e)
+        if loggers_cfg.json.get("enabled", False):
+            try:
+                self.backends.append(_JsonLogger(cfg))
+            except Exception as e:
+                logging.warning("JsonLogger disabled: %s", e)
 
     def log_config(self, cfg_dict: Dict[str, Any]) -> None:
         for b in self.backends:

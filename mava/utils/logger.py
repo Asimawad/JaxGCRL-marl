@@ -35,6 +35,7 @@ from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
 from rich.pretty import pprint
 from tensorboard_logger import configure, log_value
+import wandb
 
 from mava.types import Metrics
 
@@ -245,20 +246,8 @@ class NeptuneLogger(BaseLogger):
         if run_id is not None:
             self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
         else:
-            tags = list(tag)
-            group_tags = list(group_tag)
-
-            if "AICHOR_EXPERIMENT_ID" in os.environ:  # If on aichor add extra info
-                tags.append(os.environ.get("AICHOR_USER_NAME", ""))  # Person who launched exp
-                tags.append(os.environ.get("VCS_SHA_SHORT", ""))  # Commit SHA to track code
-                tags.append(os.environ.get("VCS_COMMIT_MESSAGE_SHORT", ""))  # Commit message
-                group_tags.append(os.environ.get("VCS_REF_NAME", ""))  # Git branch name
-
-                tags = [tag for tag in tags if tag]  # filter out empty strings
-                group_tags = [tag for tag in group_tags if tag]  # filter out empty strings
-
-            self.logger = neptune.init_run(project=project, tags=tags, mode=mode)
-            self.logger["sys/group_tags"].add(group_tags)
+            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
+            self.logger["sys/group_tags"].add(list(group_tag))
 
         self.detailed_logging = detailed_logging
         self.upload_json_data = upload_json_data
@@ -323,7 +312,7 @@ class TensorboardLogger(BaseLogger):
 
 class JsonLogger(BaseLogger):
     # These are the only metrics that marl-eval needs to plot.
-    _METRICS_TO_LOG: ClassVar[List[str]] = ["episode_return/mean", "win_rate", "steps_per_second"]
+    _METRICS_TO_LOG: ClassVar[List[str]] = ["episode_return/mean", "win_rate", "steps_per_second", "success/mean"]
 
     def __init__(
         self,
@@ -402,15 +391,7 @@ class ConsoleLogger(BaseLogger):
         """
         self.logger = logging.getLogger()
 
-        # Preserve existing file handlers (e.g., from Hydra) before clearing
-        file_handlers = [h for h in self.logger.handlers if isinstance(h, logging.FileHandler)]
-        
-        # Clear all handlers
         self.logger.handlers = []
-        
-        # Re-add preserved file handlers (Hydra's log file handler)
-        for fh in file_handlers:
-            self.logger.addHandler(fh)
 
         ch = logging.StreamHandler()
         formatter = logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s", "%H:%M:%S")
@@ -425,7 +406,9 @@ class ConsoleLogger(BaseLogger):
 
         # Replace underscores with spaces and capitalise keys.
         key = key.replace("_", " ").capitalize()
-        self.logger.info(f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value:.3f}{Style.RESET_ALL}")
+        self.logger.info(
+            f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value:.3f}{Style.RESET_ALL}"
+        )
 
     def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         # in case the dict is nested, flatten it.
@@ -441,7 +424,9 @@ class ConsoleLogger(BaseLogger):
             values.append(f"{value:.3f}" if isinstance(value, float) else str(value))
         log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values, strict=True)])
 
-        self.logger.info(f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}")
+        self.logger.info(
+            f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
+        )
 
     def log_config(self, config: Metrics) -> None:
         colour = self._EVENT_COLOURS[LogEvent.MISC]
@@ -495,6 +480,7 @@ def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:
 
     # np instead of jnp because we don't jit here
     return {"mean": np.mean(x), "std": np.std(x), "min": np.min(x), "max": np.max(x)}
+
 class WandbLogger(BaseLogger):
     def __init__(
         self,
@@ -506,29 +492,15 @@ class WandbLogger(BaseLogger):
         tags: list[str] | None = None,
         group: str | None = None,
         detailed_logging: bool = False,
-        run_id: str | None = None,
+        upload_json_data: bool = True,        run_id: str | None = None,
         run_name: str | None = None,
     ) -> None:
-        """Initialize Weights & Biases logger for experiment tracking.
-
-        Args:
-            base_exp_path: Base path where all logs are stored.
-            unique_token: Unique identifier string for this run.
-            system_name: Name of the system/algorithm being logged.
-            project: W&B project name.
-            entity: W&B entity (user or team). None uses the default entity.
-            tags: List of tags for the W&B run.
-            group: Group name for organizing related runs.
-            detailed_logging: Whether to log detailed metrics (incl. std/min/max).
-            run_id: ID of the run to resume. None creates a new run.
-            run_name: Name of the run. None uses the system name.
-        """
-        import wandb
 
         self._wandb = wandb
+        json_exp_path = get_logger_path(system_name, "json")
         self.detailed_logging = detailed_logging
-        if run_name is not None:
-            system_name = run_name
+        if run_name is  None:
+            run_name = system_name
 
 
         if run_id is not None:
@@ -547,8 +519,14 @@ class WandbLogger(BaseLogger):
                 entity=entity,
                 tags=run_tags,
                 group=group,
-                name=f"{system_name}_{unique_token}",
+                name=f"{run_name}_{unique_token}",
             )
+        self.detailed_logging = detailed_logging
+        self.upload_json_data = upload_json_data
+
+        # Store json path for uploading json data to WandB.
+        self.json_file_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
+        self.unique_token = unique_token
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         is_main_metric = "/" not in key or key.endswith("/mean")
@@ -562,5 +540,28 @@ class WandbLogger(BaseLogger):
         self.logger.config.update(config, allow_val_change=True)
 
     def stop(self) -> None:
+        if self.upload_json_data:
+            self._zip_and_upload_json()
         self.logger.finish()
 
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
+        flat = flatten_dict(data, sep="/")
+        batch: dict[str, float] = {}
+        for key, value in flat.items():
+            is_main_metric = "/" not in key or key.endswith("/mean")
+            if not self.detailed_logging and not is_main_metric:
+                continue
+            value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
+            batch[f"{event.value}/{key}"] = value
+        if batch:
+            self.logger.log(batch, step=step)
+
+    def _zip_and_upload_json(self) -> None:
+        # Create the zip file path by replacing '.json' with '.zip'
+        zip_file_path = self.json_file_path.with_suffix(".zip").as_posix()
+
+        # Create a zip file containing the specified JSON file
+        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(self.json_file_path, arcname=self.json_file_path.name)
+
+        self.logger.save(zip_file_path, policy="now")
