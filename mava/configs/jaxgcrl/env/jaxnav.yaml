@@ -1,0 +1,13 @@
+# JaxNav single-agent variant for the mava.jaxgcrl port.
+#
+# Requires `jaxmarl` to be installed:  uv sync --extra jaxnav
+#
+# Goal: navigate the agent to a target (x, y) in a 2-D LIDAR maze.
+#       num_agents=1 is forced by the adapter — multi-agent is out of scope here.
+#
+# Obs layout produced by mava/jaxgcrl/envs/jaxnav_adapter.py:
+#   [ agents_view (lidar+vel+goal_dist+goal_orient+λ, default 205) | pos_xy(2) | goal_xy(2) ]
+#   total = 209-D
+env_name: jaxnav
+backend: null      # not used by jaxmarl envs but kept for API compat
+eval_env: null

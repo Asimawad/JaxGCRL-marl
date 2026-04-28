@@ -37,6 +37,12 @@ dependencies = [
   "id-marl-eval",                # JsonLogger writes the marl-eval plot format
 ]
 
+# Opt-in extras. Install with: uv sync --extra jaxnav
+# Pulls in jaxmarl, needed only if you run `env=jaxnav` via the adapter at
+# mava/jaxgcrl/envs/jaxnav_adapter.py.
+[project.optional-dependencies]
+jaxnav = ["jaxmarl"]
+
 [project.scripts]
 jaxgcrl = "run:cli"
 

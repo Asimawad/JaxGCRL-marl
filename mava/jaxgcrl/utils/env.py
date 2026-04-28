@@ -54,6 +54,7 @@ legal_envs = (
     "simple_u_maze",
     "simple_big_maze",
     "simple_hardest_maze",
+    "jaxnav",
 )
 
 
@@ -114,6 +115,11 @@ def create_env(env_name: str, backend: str = None, **kwargs) -> object:
         env = ArmBinpickEasy(backend=backend or "mjx")
     elif env_name == "arm_binpick_hard":
         env = ArmBinpickHard(backend=backend or "mjx")
+    elif env_name == "jaxnav":
+        # jaxmarl-based JaxNav, single-agent. Lazy import: jaxmarl is an opt-in
+        # extra (`uv sync --extra jaxnav`); only fail at call time.
+        from mava.jaxgcrl.envs.jaxnav_adapter import JaxNavSingleAgent
+        env = JaxNavSingleAgent(**kwargs)
     else:
         raise ValueError(f"Unknown environment: {env_name}")
     return env
