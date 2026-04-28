@@ -1,0 +1,44 @@
+# CPPO single-run variant (no optuna sweep).
+#
+# Same as cppo.yaml but with the four sweep-related lines removed:
+#   - search_space@hydra.sweeper.params: cppo   (no auto-sample)
+#   - override hydra/sweeper: optuna             (no optuna sweeper)
+#   - override hydra/sweeper/sampler: tpe        (no sampler)
+#   - hydra.mode: MULTIRUN                       (no forced multirun)
+#
+# Use it when you want one training run with the recipe defaults from
+# system/cppo.yaml — no hyperparam randomization, no n_trials business:
+#
+#   python -m mava.jaxgcrl.run --config-name=cppo_norun env=ant
+#   python -m mava.jaxgcrl.run --config-name=cppo_norun env=jaxnav
+#   python -m mava.jaxgcrl.run --config-name=cppo_norun env=jaxnav system.actor_lr=1e-4
+#   python -m mava.jaxgcrl.run --config-name=cppo_norun -m run.seed=0,1,2   # multi-seed via CLI -m
+
+defaults:
+  - logger: logger
+  - system: cppo
+  - env: ant
+  - _self_
+
+agent: cppo
+
+run:
+  seed: 0
+  total_env_steps: 50_000_000
+  num_envs: 512
+  num_eval_envs: 512
+  episode_length: 1001
+  num_evals: 30
+  action_repeat: 1
+  cuda: true
+  max_devices_per_host: 1
+
+  exp_name: cppo_${env.env_name}_seed${run.seed}_${now:%Y-%m-%d}
+  log_wandb: true
+  wandb_project_name: cppo-brax
+  wandb_group: cppo-${env.env_name}-${now:%Y-%m-%d}
+  wandb_mode: online
+
+  visualization_interval: 5
+  vis_length: 1000
+  checkpoint_logdir: null
