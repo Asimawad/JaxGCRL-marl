@@ -1,0 +1,43 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: icrl/ppo_crl_continuous
+  - network: ppo_crl
+  - env: jaxnav
+  - search_space@hydra.sweeper.params: ppo_crl
+  - override hydra/sweeper: optuna
+  - override hydra/sweeper/sampler: tpe
+  - _self_
+
+logger:
+  loggers:
+    wandb:
+      tags: ["ppo_crl_continuous", "jaxnav"]
+      group: ["ppo_crl_continuous-sweep-04-24-2026"]
+      enabled: True
+      project: "jaxnav"
+      entity: "asim_osman-aimst-university"
+
+arch:
+  num_envs: 256
+  num_evaluation: 40
+  num_eval_episodes: 1024
+  absolute_metric: False
+
+env:
+  goal_type: distance
+  eval_metric: success
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    sampler:
+      seed: 42
+    direction: maximize
+    study_name: default-study-name
+    storage: null
+    n_trials: 200
+    n_jobs: 1
+
+  searchpath:
+    - file://mava/configs

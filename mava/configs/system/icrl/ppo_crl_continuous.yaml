@@ -1,0 +1,96 @@
+# --- PPO-CRL Continuous System Config ---
+# PPO actor + CRL contrastive critic for continuous action spaces (e.g., JaxNav)
+
+# Enable ICRL
+use_icrl: true
+
+# Seed
+total_timesteps: ~ # Set the total environment steps.
+num_updates: 650 # Number of updates
+seed: 42
+
+# Training steps
+update_batch_size: 1
+add_agent_id: False
+
+# Environment steps
+rollout_length: 256
+num_epochs: 4
+batch_size: 256
+
+# Learning rates
+actor_lr: 3e-4
+q_lr: 3e-4
+max_grad_norm: 0.5
+lr_linear_decay: false
+lr_end: 1e-7
+
+# Algorithm
+gamma: 0.99
+
+# PPO hyperparameters
+         
+clip_eps: 0.2
+ent_coef: 0.01
+ent_coef_end: 0.01
+ent_schedule_horizon: ~ # defaults to num_updates; set to decay faster
+
+# Monte Carlo samples for V(s,g) estimation
+num_mc_samples: 16
+
+# ICRL-specific
+logsumexp_penalty_coeff: 0.1
+
+# Representation size
+rep_size: 64
+
+# Actor log_std clipping
+log_std_min: -5.0
+log_std_max: 2.0
+
+# Scale factor for action input to SA encoder (amplifies action signal)
+sa_action_scale: 1.0
+
+# Action embedding dimension (0 = no embedding, raw concat; >0 = embed action to this dim)
+action_embed_dim: 0
+
+# Use FiLM conditioning in SA encoder (action modulates state features)
+use_film: false
+
+# Min std for MC V estimation (prevents vanishing advantages when entropy collapses)
+mc_std_floor: 0.0
+
+# Use Q directly as advantage (REINFORCE-style, no V baseline)
+use_reinforce: false
+
+# Entropy management
+target_entropy: 2.0
+entropy_floor_coeff: 0.0
+use_adaptive_entropy: false
+alpha_lr: 3e-4
+
+# Contrastive learning options
+energy_fn: "norm"
+contrastive_loss_fn: "sym_infonce"
+contrastive_temperature: 1.0
+
+# Extra critic-only epochs per update (0 = disabled)
+num_critic_warmup_epochs: 0
+
+# Whether to include achieved_goal in SA encoder and actor inputs
+use_achieved_goal: true
+
+# Blend environment rewards into advantage (0 = pure CRL, >0 = hybrid)
+reward_advantage_coeff: 0.0
+
+# GAE-based advantages (uses value network + env rewards instead of CRL Q-V)
+use_gae: false
+gae_lambda: 0.95
+vf_coef: 0.5
+
+# Goal configuration
+icrl:
+  goal_type: "distance"
+
+deterministic_resets: false
+use_old_wrapper: false

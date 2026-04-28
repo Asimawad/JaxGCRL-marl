@@ -1,0 +1,33 @@
+# Environment steps
+system.num_epochs: choice(1, 2, 4, 6, 8) 
+system.batch_size: choice(256, 512)
+
+# Monte Carlo samples for V(s,g) estimation
+system.num_mc_samples: choice(16, 32, 64)
+
+# ICRL-specific
+system.logsumexp_penalty_coeff: interval(0.01, 1.00)
+
+# Entropy management
+system.target_entropy: interval(-1.0, 5.0)
+system.use_adaptive_entropy: choice(True, False)
+system.alpha_lr: tag(log, interval(1e-7, 1e-3))
+
+# Contrastive learning options
+system.energy_fn: choice("norm", "l2", "dot", "cosine")
+system.contrastive_loss_fn: choice("fwd_infonce", "bwd_infonce", "sym_infonce", "binary_nce")
+system.contrastive_temperature: interval(0.1, 10.0)
+
+# Extra critic-only epochs per update (0 = disabled)
+system.num_critic_warmup_epochs: choice(0, 1, 2)
+
+system.actor_lr: tag(log, interval(1e-7, 1e-3))
+system.q_lr: tag(log, interval(1e-7, 1e-3))
+system.max_grad_norm: choice(0.5, 1.0, 5.0, 10)
+system.lr_linear_decay: choice(True, False)
+system.lr_end: tag(log, interval(1e-7, 1e-5))
+
+system.gamma: choice(0.9, 0.95, 0.98, 0.99, 0.9999, 0.999999)
+
+system.clip_eps: interval(0.1, 0.5)
+system.ent_coef: interval(0.01, 0.3)

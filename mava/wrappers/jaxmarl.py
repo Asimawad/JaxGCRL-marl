@@ -1,0 +1,841 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import copy
+from abc import ABC, abstractmethod
+from collections import namedtuple
+from functools import cached_property
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Tuple, TypeVar, Union, Optional
+
+import chex
+import jax
+import jax.numpy as jnp
+from brax.envs import State as BraxState
+from chex import Array, PRNGKey
+from gymnax.environments import spaces as gymnax_spaces
+from jaxmarl.environments import SMAX
+from jaxmarl.environments import spaces as jaxmarl_spaces
+from jaxmarl.environments.jaxnav.jaxnav_env import EnvInstance, JaxNav
+from jaxmarl.environments.mabrax import MABraxEnv
+from jaxmarl.environments.mpe.simple import State as MPEState
+from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
+from jaxmarl.environments.multi_agent_env import MultiAgentEnv
+from jumanji import specs
+from jumanji.types import StepType, TimeStep, restart
+from jumanji.wrappers import Wrapper
+
+from mava.types import GraphObservation, GraphsTuple, Observation, ObservationGlobalState, State
+from mava.wrappers.graph_wrapper import GraphWrapper
+
+# Define a TypeVar for the state, bound to the base State type
+JaxMarlStateType = TypeVar("JaxMarlStateType", bound=State)
+
+if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from flax.struct import dataclass
+
+
+@dataclass
+class JaxMarlState(Generic[JaxMarlStateType]):
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
+    state: JaxMarlStateType
+    key: chex.PRNGKey
+    step: int
+
+
+def _is_discrete(space: jaxmarl_spaces.Space) -> bool:
+    """JaxMarl sometimes uses gymnax and sometimes uses their own specs, so this is needed."""
+    return isinstance(space, (gymnax_spaces.Discrete, jaxmarl_spaces.Discrete))
+
+
+def _is_box(space: jaxmarl_spaces.Space) -> bool:
+    """JaxMarl sometimes uses gymnax and sometimes uses their own specs, so this is needed."""
+    return isinstance(space, (gymnax_spaces.Box, jaxmarl_spaces.Box))
+
+
+def _is_dict(space: jaxmarl_spaces.Space) -> bool:
+    """JaxMarl sometimes uses gymnax and sometimes uses their own specs, so this is needed."""
+    return isinstance(space, (gymnax_spaces.Dict, jaxmarl_spaces.Dict))
+
+
+def _is_tuple(space: jaxmarl_spaces.Space) -> bool:
+    return isinstance(space, (gymnax_spaces.Tuple, jaxmarl_spaces.Tuple))
+
+
+def batchify(x: Dict[str, Array], agents: List[str]) -> Array:
+    """Stack dictionary values into a single array."""
+    return jnp.stack([x[agent] for agent in agents])
+
+
+def unbatchify(x: Array, agents: List[str]) -> Dict[str, Array]:
+    """Split array into dictionary entries."""
+    return {agent: x[i] for i, agent in enumerate(agents)}
+
+
+def merge_space(
+    spec: Dict[str, Union[jaxmarl_spaces.Box, jaxmarl_spaces.Discrete]],
+) -> jaxmarl_spaces.Space:
+    """Convert a dictionary of spaces into a single space with a num_agents size first dimension.
+
+    JaxMarl uses a dictionary of specs, one per agent. For now we want this to be a single spec.
+    """
+    n_agents = len(spec)
+    # Get the first agent's spec from the dictionary.
+    single_spec = copy.deepcopy(next(iter(spec.values())))
+
+    err = f"Unsupported space for merging spaces, expected Box or Discrete, got {type(single_spec)}"
+    assert _is_discrete(single_spec) or _is_box(single_spec), err
+
+    new_shape = (n_agents, *single_spec.shape)
+    single_spec.shape = new_shape
+
+    return single_spec
+
+
+def is_homogenous(env: MultiAgentEnv) -> bool:
+    """Check that all agents in an environment have the same observation and action spaces.
+
+    Note: currently this is done by checking the shape of the observation and action spaces
+    as gymnax/jaxmarl environments do not have a custom __eq__ for their specs.
+    """
+    agents = list(env.observation_spaces.keys())
+
+    main_agent_obs_shape = env.observation_space(agents[0]).shape
+    main_agent_act_shape = env.action_space(agents[0]).shape
+    # Cannot easily check low, high and n are the same, without being very messy.
+    # Unfortunately gymnax/jaxmarl doesn't have a custom __eq__ for their specs.
+    same_obs_shape = all(env.observation_space(agent).shape == main_agent_obs_shape for agent in agents[1:])
+    same_act_shape = all(env.action_space(agent).shape == main_agent_act_shape for agent in agents[1:])
+
+    return same_obs_shape and same_act_shape
+
+
+def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
+    """Convert a jaxmarl space to a jumanji spec."""
+    if _is_discrete(space):
+        # jaxmarl have multi-discrete, but don't seem to use it.
+        if space.shape == ():
+            return specs.DiscreteArray(num_values=space.n, dtype=space.dtype)
+        else:
+            return specs.MultiDiscreteArray(num_values=jnp.full(space.shape, space.n), dtype=space.dtype)
+    elif _is_box(space):
+        return specs.BoundedArray(
+            shape=space.shape,
+            dtype=space.dtype,
+            minimum=space.low,
+            maximum=space.high,
+        )
+    elif _is_dict(space):
+        # Jumanji needs something to hold the specs
+        constructor = namedtuple("SubSpace", list(space.spaces.keys()))  # type: ignore
+        # Recursively convert spaces to specs
+        sub_specs = {
+            sub_space_name: jaxmarl_space_to_jumanji_spec(sub_space)
+            for sub_space_name, sub_space in space.spaces.items()
+        }
+        return specs.Spec(constructor=constructor, name="", **sub_specs)
+    elif _is_tuple(space):
+        # Jumanji needs something to hold the specs
+        field_names = [f"sub_space_{i}" for i in range(len(space.spaces))]
+        constructor = namedtuple("SubSpace", field_names)  # type: ignore
+        # Recursively convert spaces to specs
+        sub_specs = {
+            f"sub_space_{i}": jaxmarl_space_to_jumanji_spec(sub_space) for i, sub_space in enumerate(space.spaces)
+        }
+        return specs.Spec(constructor=constructor, name="", **sub_specs)
+    else:
+        raise ValueError(f"Unsupported JaxMarl space: {space}")
+
+
+class JaxMarlWrapper(Wrapper, ABC):
+    """A wrapper for JaxMarl environments to make their API compatible with Jumanji environments."""
+
+    def __init__(
+        self,
+        env: MultiAgentEnv,
+        has_global_state: bool,
+        # We set this to -1 to make it an optional input for children of this class.
+        # They must set their own defaults or use the wrapped envs value.
+        time_limit: int = -1,
+    ) -> None:
+        """Initialize the JaxMarlWrapper.
+
+        Args:
+        ----
+        - env: The JaxMarl environment to wrap.
+        - has_global_state: Whether the environment has global state.
+        - time_limit: The time limit for each episode.
+        """
+        # Check that all specs are the same as we only support homogeneous environments, for now ;)
+        homogenous_error = (
+            f"Mava only supports environments with homogeneous agents, "
+            f"but you tried to use {env} which is not homogeneous."
+        )
+        assert is_homogenous(env), homogenous_error
+        # Making sure the child envs set this correctly.
+        assert time_limit > 0, f"Time limit must be greater than 0, got {time_limit}"
+
+        self.has_global_state = has_global_state
+        self.time_limit = time_limit
+        super().__init__(env)
+        self._env: MultiAgentEnv
+        self.agents = self._env.agents
+        self.num_agents = self._env.num_agents
+
+        # Calling these on init to cache the values in a non-jitted context.
+        self.state_size  # noqa: B018
+        self.action_dim  # noqa: B018
+
+    def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        key, reset_key = jax.random.split(key)
+        obs, env_state = self._env.reset(reset_key)
+
+        metrics: Dict[str, Any] = {"env_metrics": {}}  # default to no metrics
+        obs = self._create_observation(obs, env_state)
+        state = JaxMarlState(env_state, key, jnp.array(0, dtype=int))
+        timestep = restart(obs, shape=(self.num_agents,), extras=metrics)
+
+        return state, timestep
+
+    def step(
+        self, state: JaxMarlState, action: Array
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        key, step_key = jax.random.split(state.key)
+        obs, env_state, reward, done, _ = self._env.step(step_key, state.state, unbatchify(action, self.agents))
+
+        metrics: Dict[str, Any] = {"env_metrics": {}}  # default to no metrics
+        obs = self._create_observation(obs, env_state)
+        obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
+        step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
+
+        ts = TimeStep(
+            step_type=step_type,
+            reward=batchify(reward, self.agents),
+            discount=(1.0 - batchify(done, self.agents)).astype(float),
+            observation=obs,
+            extras=metrics,
+        )
+        state = JaxMarlState(env_state, key, state.step + jnp.array(1, dtype=int))
+
+        return state, ts
+
+    def _create_observation(
+        self,
+        obs: Dict[str, Array],
+        wrapped_env_state: Any,
+    ) -> Union[Observation, ObservationGlobalState]:
+        """Create an observation from the raw observation and environment state."""
+        obs_data = {
+            "agents_view": batchify(obs, self.agents),
+            "action_mask": self.action_mask(wrapped_env_state),
+            "step_count": jnp.zeros(self.num_agents, dtype=int),
+        }
+        if self.has_global_state:
+            obs_data["global_state"] = self.get_global_state(wrapped_env_state, obs)
+            return ObservationGlobalState(**obs_data)
+
+        return Observation(**obs_data)
+
+    @cached_property
+    def observation_spec(self) -> specs.Spec:
+        agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
+
+        action_mask = specs.BoundedArray((self.num_agents, self.action_dim), bool, False, True, "action_mask")
+        step_count = specs.BoundedArray((self.num_agents,), jnp.int32, 0, self.time_limit, "step_count")
+
+        if self.has_global_state:
+            global_state = specs.Array(
+                (self.num_agents, self.state_size),
+                agents_view.dtype,
+                "global_state",
+            )
+
+            return specs.Spec(
+                ObservationGlobalState,
+                "ObservationSpec",
+                agents_view=agents_view,
+                action_mask=action_mask,
+                global_state=global_state,
+                step_count=step_count,
+            )
+
+        return specs.Spec(
+            Observation,
+            "ObservationSpec",
+            agents_view=agents_view,
+            action_mask=action_mask,
+            step_count=step_count,
+        )
+
+    @cached_property
+    def action_spec(self) -> specs.Spec:
+        return jaxmarl_space_to_jumanji_spec(merge_space(self._env.action_spaces))
+
+    @cached_property
+    def reward_spec(self) -> specs.Array:
+        return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
+
+    @cached_property
+    def discount_spec(self) -> specs.BoundedArray:
+        return specs.BoundedArray(
+            shape=(self.num_agents,),
+            dtype=float,
+            minimum=0.0,
+            maximum=1.0,
+            name="discount",
+        )
+
+    @property
+    def unwrapped(self) -> MultiAgentEnv:
+        return self._env
+
+    @abstractmethod
+    def action_mask(self, wrapped_env_state: Any) -> Array:
+        """Get action mask for each agent."""
+        ...
+
+    @abstractmethod
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation for each agent."""
+        ...
+
+    @cached_property
+    @abstractmethod
+    def action_dim(self) -> chex.Array:
+        """Get the actions dim for each agent."""
+        ...
+
+    @cached_property
+    @abstractmethod
+    def state_size(self) -> chex.Array:
+        """Get the sate size of the global observation"""
+        ...
+
+
+class SmaxWrapper(JaxMarlWrapper):
+    """Wrapper for SMAX environment"""
+
+    def __init__(
+        self,
+        env: MultiAgentEnv,
+        has_global_state: bool = False,
+    ):
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: SMAX
+
+    def reset(self, key: PRNGKey) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().reset(key)
+        extras = {"env_metrics": {"won_episode": False}}
+        ts = ts.replace(extras=extras)
+        return state, ts
+
+    def step(
+        self, state: JaxMarlState, action: Array
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().step(state, action)
+
+        current_winner = (ts.step_type == StepType.LAST) & jnp.all(ts.reward >= 1.0)
+        extras = {"env_metrics": {"won_episode": current_winner}}
+        ts = ts.replace(extras=extras)
+        return state, ts
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        """Get the sate size of the global observation"""
+        return self._env.state_size
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        """Get the actions dim for each agent."""
+        single_agent_action_space = self._env.action_space(self.agents[0])
+        return single_agent_action_space.n
+
+    def action_mask(self, wrapped_env_state: Any) -> Array:
+        """Get action mask for each agent."""
+        avail_actions = self._env.get_avail_actions(wrapped_env_state)
+        return jnp.array(batchify(avail_actions, self.agents), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation and copy it for each agent."""
+        return jnp.tile(jnp.array(obs["world_state"]), (self.num_agents, 1))
+
+
+class MabraxWrapper(JaxMarlWrapper):
+    """Wrraper for the Mabrax environment."""
+
+    def __init__(
+        self,
+        env: MABraxEnv,
+        has_global_state: bool = False,
+    ):
+        super().__init__(env, has_global_state, env.episode_length)
+        self._env: MABraxEnv
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        """Get the actions dim for each agent."""
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        """Get the sate size of the global observation"""
+        brax_env = self._env.env
+        return brax_env.observation_size
+
+    def action_mask(self, wrapped_env_state: BraxState) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: BraxState, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation and copy it for each agent."""
+        # Use the global state of brax.
+        return jnp.tile(wrapped_env_state.obs, (self.num_agents, 1))
+
+
+class MPEWrapper(JaxMarlWrapper):
+    """Wrapper for the MPE environment."""
+
+    def __init__(
+        self,
+        env: SimpleSpreadMPE,
+        has_global_state: bool = False,
+    ):
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: SimpleSpreadMPE
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        # Adjusted automatically based on the action_type specified in the kwargs.
+        if _is_discrete(self._env.action_space(self.agents[0])):
+            return self._env.action_space(self.agents[0]).n
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        "Get the state size of the global observation"
+        return self._env.observation_space(self.agents[0]).shape[0] * self.num_agents
+
+    def action_mask(self, wrapped_env_state: Any) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation and copy it for each agent."""
+        global_state = jnp.concatenate([obs[agent_id] for agent_id in obs])
+        return jnp.tile(global_state, (self.num_agents, 1))
+
+
+class MPEGraphWrapper(GraphWrapper):
+    """Wrapper for the MPE environment that adds a graph to the observation.
+
+    This wrapper creates a graph topology for each agent where:
+    - Each agent and landmark is represented as a node in the graph
+    - Node features are relative positions and velocities with respect to the ego agent
+      (4D features: [relative_x, relative_y, relative_vx, relative_vy])
+    - Edges are created based on a visibility radius - nodes are connected only if they
+      are within this radius of each other
+    - Edge features are the Euclidean distances between connected nodes
+    - Self-loops can be optionally added to each node
+
+    For example, in a 3-agent environment with 2 landmarks:
+    - Each agent gets its own graph with 5 nodes (3 agents + 2 landmarks)
+    - For Agent 0's graph:
+      * Node features are positions/velocities relative to Agent 0
+      * Edges connect nodes that are within visibility_radius of each other
+      * Edge features are the distances between connected nodes
+      * ego_node_index=0 identifies Agent 0 as the reference point
+    - For Agent 1's graph:
+      * Node features are positions/velocities relative to Agent 1
+      * Different edge connections based on Agent 1's visibility
+      * Edge features are the distances between connected nodes
+      * ego_node_index=1 identifies Agent 1 as the reference point
+
+    This relative representation allows each agent to have its own perspective of the
+    environment, with node features and graph topology specific to its viewpoint.
+    """
+
+    def __init__(
+        self,
+        env: MPEWrapper,
+        add_self_loops: bool = True,
+        visibility_radius: float = 1,
+    ):
+        super().__init__(env)
+        self._env: MPEWrapper
+
+        self.add_self_loops = add_self_loops
+        self.visibility_radius = visibility_radius
+
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
+
+        self.num_entities = self._env.num_entities
+        self.node_features_dim = 4
+
+    def visibility_graph_for_ego(
+        self,
+        state: MPEState,
+        visibility_radius: float,
+        ego_idx: int,
+    ) -> GraphsTuple:
+        """Return a GraphsTuple for ONE ego agent, with edges defined by a
+        global, uniform visibility radius."""
+
+        positions = state.p_pos
+
+        dists = jnp.linalg.norm(positions[:, None, :] - positions[None, :, :], axis=-1)
+
+        mask = dists <= visibility_radius
+        if not self.add_self_loops:
+            mask = mask.at[jnp.arange(self.num_entities), jnp.arange(self.num_entities)].set(False)
+
+        max_n_edge = self.num_entities * self.num_entities
+        senders, receivers = jnp.nonzero(mask, size=max_n_edge, fill_value=-1)
+
+        # ------------------------------------------------------------------
+        # build a "safe" distance matrix
+        # *shape* = (N+1, N+1) so index N is guaranteed valid
+        # last row / col are all zeros
+        # ------------------------------------------------------------------
+        safe_dists = jnp.pad(  # (N, N)  ->  (N+1, N+1)
+            dists,
+            pad_width=((0, 1), (0, 1)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        N = self.num_entities
+        safe_senders = jnp.where(senders < 0, N, senders)
+        safe_receivers = jnp.where(receivers < 0, N, receivers)
+        # for invalid edges, edge feature would be 0.0
+        edge_features = safe_dists[safe_senders, safe_receivers][..., None]
+
+        node_features = jnp.concatenate([positions - positions[ego_idx], state.p_vel - state.p_vel[ego_idx]], axis=-1)
+        assert node_features.shape[-1] == self.node_features_dim, (
+            f"Node features dim specified in MPEWrapper is {self.node_features_dim}, "
+            f"but got {node_features.shape[-1]} for agent {ego_idx}."
+        )
+
+        n_node = jnp.asarray([self.num_entities])
+        n_edge = jnp.asarray([max_n_edge])
+
+        return GraphsTuple(
+            nodes=node_features,
+            edges=edge_features,
+            senders=senders,
+            receivers=receivers,
+            n_node=n_node,
+            n_edge=n_edge,
+            globals=None,
+            ego_node_index=jnp.asarray([ego_idx]),
+        )
+
+    def add_graph_to_observations(
+        self, state: JaxMarlState[MPEState], observation: Union[Observation, ObservationGlobalState]
+    ) -> GraphObservation:
+        b_graph = jax.vmap(self.visibility_graph_for_ego, in_axes=(None, None, 0))(
+            state.state, self.visibility_radius, jnp.arange(self.num_agents)
+        )
+        return GraphObservation(observation=observation, graph=b_graph)
+
+    @cached_property
+    def observation_spec(
+        self,
+    ) -> Union[
+        specs.Spec[GraphObservation[Observation]],
+        specs.Spec[GraphObservation[ObservationGlobalState]],
+    ]:
+        """Define the observation spec for the Jraph graph representation."""
+        obs_spec = self._env.observation_spec
+
+        max_n_edge = self.num_entities * self.num_entities
+
+        graph_spec = specs.Spec(
+            constructor=GraphsTuple,
+            name="graph",
+            nodes=specs.Array(
+                shape=(
+                    self.num_agents,
+                    self.num_entities,
+                    self.node_features_dim,
+                ),
+                dtype=jnp.float32,
+                name="nodes",
+            ),
+            edges=specs.Array(shape=(self.num_agents, max_n_edge, 1), dtype=jnp.float32, name="edges"),
+            senders=specs.Array(shape=(self.num_agents, max_n_edge), dtype=jnp.int32, name="senders"),
+            receivers=specs.Array(shape=(self.num_agents, max_n_edge), dtype=jnp.int32, name="receivers"),
+            n_node=specs.Array(shape=(self.num_agents, 1), dtype=jnp.int32, name="n_node"),
+            n_edge=specs.Array(shape=(self.num_agents, 1), dtype=jnp.int32, name="n_edge"),
+            globals=None,
+            ego_node_index=specs.Array(shape=(self.num_agents, 1), dtype=jnp.int32, name="ego_node_index"),
+        )
+
+        return specs.Spec(
+            GraphObservation,
+            "GraphObservation",
+            observation=obs_spec,
+            graph=graph_spec,
+        )
+
+@dataclass
+class JaxNavState(Generic[JaxMarlStateType]):
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
+    state: JaxMarlStateType
+    goal: Array
+    key: chex.PRNGKey
+    step: int
+    metrics: dict
+
+
+class JaxNavWrapper(JaxMarlWrapper):
+    """Wrapper for the JaxNav environment.
+    
+    Args:
+        env: The JaxNav environment to wrap.
+        has_global_state: Whether to include global state in observations.
+        goal_type: Type of goal representation for ICRL/goal-conditioned learning.
+            - "distance": Goal is the Euclidean distance to target (default, 1D).
+            - "full_observation": Goal is the full observation the agent would have
+              at the goal state (same dimension as agent observation).
+    """
+
+    def __init__(
+        self,
+        env: JaxNav,
+        has_global_state: bool = False,
+        goal_type: str = "distance",
+    ):
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: JaxNav
+        
+        # Validate goal_type
+        valid_goal_types = ("distance", "full_observation", "position")
+        if goal_type not in valid_goal_types:
+            raise ValueError(f"Invalid goal_type: {goal_type}. Must be one of {valid_goal_types}")
+        self.goal_type = goal_type
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        # Adjusted automatically based on the action_type specified in the kwargs.
+        if _is_discrete(self._env.action_space(self.agents[0])):
+            return self._env.action_space(self.agents[0]).n
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    def action_mask(self, wrapped_env_state: Any) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation for each agent."""
+        return jnp.tile(self._env.get_world_state(wrapped_env_state), (self.num_agents, 1))
+
+    @cached_property
+    def goal_dim(self) -> int:
+        """Get the goal dimension based on goal_type.
+        
+        Returns:
+            1 for "distance" goal type (scalar distance to target).
+            observation_dim for "full_observation" goal type.
+        """
+        if self.goal_type == "distance":
+            return 1
+        elif self.goal_type == "position":
+            return 2
+        else:  # full_observation
+            # Observation dimension: lidar_num_beams + 5 (vel(2) + goal_dist(1) + goal_orient(1) + lambda(1))
+            return self._env.lidar_num_beams + 5
+
+    def reset(
+        self, key: PRNGKey
+    ) -> Tuple[JaxNavState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        key, reset_key = jax.random.split(key)
+        jaxmarl_obs, env_state = self._env.reset(reset_key)
+
+        obs = self._create_observation(jaxmarl_obs, env_state)
+        
+        # Compute the ultimate goal (what we want to achieve)
+        goal = self._compute_goal(env_state)
+        
+        # Compute achieved goal (current state in goal format)
+        achieved_goal = self._compute_achieved_goal(env_state)
+
+        state = JaxNavState(
+            env_state,
+            goal,
+            key,
+            jnp.array(0, dtype=int),
+            metrics={"success": jnp.zeros((self.num_agents,), jnp.int32)},
+        )
+        extras = {
+            "env_metrics": {
+                "goal_reached": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                "success": state.metrics["success"],
+                "achieved_goal": achieved_goal,
+            }
+        }
+        timestep = restart(obs, shape=(self.num_agents,), extras=extras)
+
+        return state, timestep
+
+    def step(
+        self, state: JaxNavState, action: Array
+    ) -> Tuple[JaxNavState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        key, step_key = jax.random.split(state.key)
+        jaxmarl_obs, env_state, reward, done, info = self._env.step_env(
+            step_key,
+            state.state,
+            unbatchify(action, self.agents),
+        )
+
+        obs = self._create_observation(jaxmarl_obs, env_state)
+        step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
+
+        goal_just_reached = info["GoalR"]
+        success = state.metrics["success"] | goal_just_reached
+        
+        # Compute achieved goal (current state in goal format)
+        achieved_goal = self._compute_achieved_goal(env_state)
+        # jax.debug.print("goal_just_reached: {}, achieved_goal: {}, goal: {}, pos: {}, other: {}", goal_just_reached, achieved_goal, env_state.goal, env_state.pos, jnp.sqrt(jnp.sum((env_state.pos - env_state.goal)**2, axis=-1)))
+
+        ts = TimeStep(
+            step_type=step_type,
+            reward=batchify(reward, self.agents),
+            discount=(1.0 - batchify(done, self.agents)).astype(float),
+            observation=obs,
+            extras={"env_metrics": {"goal_reached": goal_just_reached, "success": success, "achieved_goal": achieved_goal}},
+        )
+        success = jax.lax.select(
+            done["__all__"], jnp.zeros((self.num_agents), dtype=jnp.int32), success
+        )
+        state = JaxNavState(
+            env_state, state.goal, key, state.step + jnp.array(1, dtype=int), metrics={"success": success}
+        )
+
+        return state, ts
+
+    def set_env_instance(
+        self, env_instance: EnvInstance, key
+    ) -> Tuple[JaxNavState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        jaxmarl_obs, env_state = self._env.set_env_instance(env_instance)
+        obs = self._create_observation(jaxmarl_obs, env_state)
+        
+        # Compute the ultimate goal (what we want to achieve)
+        goal = self._compute_goal(env_state)
+
+        ts = restart(
+            obs,
+            shape=(self.num_agents,),
+            extras={
+                "env_metrics": {
+                    "goal_reached": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                    "success": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                }
+            },
+        )
+        state = JaxNavState(
+            env_state,
+            goal,
+            key,
+            jnp.array(0, dtype=int),
+            metrics={"success": jnp.zeros((self.num_agents,), jnp.int32)},
+        )
+
+        return state, ts
+
+    def _compute_goal(self, state) -> Array:
+        """Compute the ultimate goal for each agent based on goal_type.
+        
+        This is what we want to achieve - the target state in goal format.
+        
+        For "distance" goal type: Returns 0 (target is to reach distance 0).
+            Shape: (num_agents, 1)
+        For "full_observation" goal type: Returns the observation the agent would
+            have if it were at its goal position.
+            Shape: (num_agents, obs_dim)
+        """
+        if self.goal_type == "distance":
+            # Ultimate goal is distance 0 (at the target)
+            return jnp.zeros((self.num_agents, 1), dtype=jnp.float32)
+        elif self.goal_type == "position":
+            # Ultimate goal is the target (x, y) position
+            return state.goal  # shape: (num_agents, 2)
+        else:  # full_observation
+            # Ultimate goal is the observation at the goal position
+            return self._compute_observation_at_position(state, state.goal)
+    
+    def _compute_achieved_goal(self, state) -> Array:
+        """Compute the achieved goal (current state in goal format).
+        
+        This represents where we currently are, in the same format as the goal.
+        Computed purely from the environment state.
+        
+        For "distance" goal type: Returns the current Euclidean distance to target.
+            Shape: (num_agents,)
+        For "full_observation" goal type: Returns the current observation.
+            Shape: (num_agents, obs_dim)
+        """
+        if self.goal_type == "distance":
+            dist = jnp.linalg.norm(state.goal - state.pos, axis=-1)
+            return dist
+        elif self.goal_type == "position":
+            # Achieved goal is the current (x, y) position
+            return state.pos  # shape: (num_agents, 2)
+        else:  # full_observation
+            # Achieved goal is the current observation, computed from state
+            return self._env._get_obs(state)
+    
+    def _compute_observation_at_position(self, state, position: Array) -> Array:
+        """Compute the observation each agent would have at a given position.
+        
+        Creates a hypothetical state where agents are at the specified positions
+        with zero velocity, then computes observations from that state.
+        
+        Args:
+            state: The current environment state.
+            position: Target positions for each agent, shape (num_agents, 2).
+        
+        Returns:
+            Array of shape (num_agents, obs_dim) containing the observations
+            each agent would see if they were at the specified positions.
+        """
+        # Create a hypothetical state where agents are at the specified positions
+        # with zero velocity and facing the same direction
+        hypothetical_state = state.replace(
+            pos=position,  # Position is now at the specified location
+            vel=jnp.zeros_like(state.vel),  # Zero velocity
+            # Keep theta (orientation) the same
+        )
+        
+        # Compute observations at the hypothetical state using the underlying env
+        return self._env._get_obs(hypothetical_state)
+
+    def render(self, state: JaxNavState) -> Any:
+        """Render the environment state and return a matplotlib figure.
+        
+        Args:
+            state: The current JaxNav environment state wrapper.
+            
+        Returns:
+            A matplotlib figure showing the current environment state.
+        """
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        self._env.init_render(ax, state.state, lidar=False, agent=True, goal=True)
+        return fig

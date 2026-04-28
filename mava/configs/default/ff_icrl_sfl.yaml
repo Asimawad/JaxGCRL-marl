@@ -1,0 +1,49 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: icrl/ff_icrl_sfl
+  - network: icrl
+  - env: jaxnav  # [mpe, smax, vector-connector]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+
+# UED/SFL Configuration
+ued:
+  batch_size: 4096       # Number of environments to evaluate for learnability per batch
+  num_batches: 1         # Number of batches to process
+  rollout_steps: 1000     # Steps per environment for success estimation
+  num_to_save: 512       # Size of learnability set (top-k environments)
+  sampling_ratio: 0.0    # Ratio of training envs sampled from learnability set vs random
+  max_episodes: 50       # Maximum episodes to track per environment
+
+arch:
+  num_envs: 128
+  num_evaluation: 100
+  absolute_metric: False
+
+env:
+  kwargs:
+    num_agents: 2
+  goal_type: distance
+
+system:
+  num_updates: 1200
+  target_entropy_scale: 3.04
+  add_agent_id: True
+  gamma: 0.9999
+  max_grad_norm: 10
+  policy_lr: 7e-4
+  q_lr: 1e-3
+  alpha_lr: 9e-4
+  logsumexp_penalty_coeff: 0.35
+  use_old_wrapper: False
+
+logger:
+  loggers:
+    neptune:
+      tag: ["icrl", "sfl"]
+      enabled: false
+

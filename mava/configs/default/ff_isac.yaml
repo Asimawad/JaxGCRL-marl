@@ -1,0 +1,16 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: sac/ff_isac
+  - network: mlp
+  - env: jaxnav  # [mabrax, mpe]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+
+system:
+  deterministic_resets: False
+  buffer_size: 100000
+  use_old_wrapper: True
