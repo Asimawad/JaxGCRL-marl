@@ -132,14 +132,20 @@ class JaxNavSingleAgent(Env):
         )
         # NOTE: brax's EpisodeWrapper / AutoResetWrapper add their own keys
         # to info and metrics (`steps`, `truncation`, `first_obs`,
-        # `first_pipeline_state`, `reward`). We seed the keys we own
-        # (`success`, `truncation`); the wrappers will add/overwrite the rest.
+        # `first_pipeline_state`, `reward`). We seed the keys we own — and
+        # crucially, `success` MUST live in `metrics` (not info) so brax's
+        # episode aggregator carries it across steps and the JaxGCRL
+        # evaluator picks it up as `eval/episode_success_any`.
         return BraxState(
             pipeline_state=wrap,
             obs=obs,
             reward=jnp.float32(0.0),
             done=jnp.float32(0.0),
-            metrics={},
+            metrics={
+                "success": jnp.float32(0.0),
+                "success_easy": jnp.float32(0.0),  # parity with ant; we treat any goal-reach as easy
+                "dist": jnp.float32(0.0),          # distance to goal at this step
+            },
             info={
                 "success": jnp.float32(0.0),
                 "truncation": jnp.float32(0.0),
@@ -181,12 +187,22 @@ class JaxNavSingleAgent(Env):
 
         # Preserve any wrapper-added keys (steps, first_obs, etc.) by merging
         # into the existing info/metrics rather than rebuilding from scratch.
-        # We only OWN `success` and `truncation`; everything else passes through.
+        # We only OWN `success`, `truncation`, `dist`; everything else passes
+        # through.
+        # Compute current distance to goal in the goal-coord frame.
+        cur_dist = jnp.linalg.norm(env_state.goal[0] - env_state.pos[0, :2])
         new_info = {**state.info, "success": success, "truncation": truncation}
+        new_metrics = {
+            **state.metrics,
+            "success": success,
+            "success_easy": success,
+            "dist": cur_dist.astype(jnp.float32),
+        }
         return state.replace(
             pipeline_state=new_wrap,
             obs=obs,
             reward=reward,
             done=done,
             info=new_info,
+            metrics=new_metrics,
         )
