@@ -82,9 +82,15 @@ def run_experiment(cfg: DictConfig) -> float:
     )
 
     # -------- Env --------
-    train_env = create_env(cfg.env.env_name, backend=cfg.env.get("backend", None))
-    if cfg.env.get("eval_env", None):
-        eval_env = create_env(cfg.env.eval_env, backend=cfg.env.get("backend", None))
+    # cfg.env may carry env-specific kwargs (e.g. jaxnav's `goal_type`). Strip
+    # the keys we consume here and pass the rest as kwargs to create_env.
+    env_dict = OmegaConf.to_container(cfg.env, resolve=True)
+    env_name = env_dict.pop("env_name")
+    env_backend = env_dict.pop("backend", None)
+    eval_env_name = env_dict.pop("eval_env", None)
+    train_env = create_env(env_name, backend=env_backend, **env_dict)
+    if eval_env_name:
+        eval_env = create_env(eval_env_name, backend=env_backend, **env_dict)
     else:
         eval_env = train_env
 

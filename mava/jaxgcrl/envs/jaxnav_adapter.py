@@ -59,25 +59,39 @@ class _JaxNavWrapState:
 class JaxNavSingleAgent(Env):
     """Brax-compatible single-agent wrapper over JaxNav (1 agent, continuous)."""
 
-    def __init__(self, **jaxnav_kwargs):
+    def __init__(self, goal_type: str = "position", **jaxnav_kwargs):
+        """
+        Args:
+            goal_type: "position" (default) or "distance".
+                - "position": target_goal = (goal_x, goal_y), achieved_goal = (pos_x, pos_y).
+                  2-D goal, varies per episode. Richer signal for HER.
+                - "distance": target_goal = 0 (scalar — "be at the goal"),
+                  achieved_goal = current Euclidean distance to target.
+                  1-D goal, target is constant. Matches Mava's `goal_type=distance`
+                  default for JaxNav. Less expressive but smaller goal space.
+        """
+        if goal_type not in ("position", "distance"):
+            raise ValueError(f"goal_type must be 'position' or 'distance', got {goal_type!r}")
+        self._goal_type = goal_type
+
         JaxNav = _import_jaxnav()
-        jaxnav_kwargs["num_agents"] = 1               # we don't support multi-agent
+        jaxnav_kwargs["num_agents"] = 1                # we don't support multi-agent
         jaxnav_kwargs.setdefault("act_type", "Continuous")
         self._env = JaxNav(**jaxnav_kwargs)
 
-        # Dimensions:
-        #   agents_view (jaxnav default) = lidar + 5 (vel x2, goal_dist, goal_orient, λ)
+        # agents_view (jaxnav default) = lidar + 5 (vel x2, goal_dist, goal_orient, λ)
         self._base_obs_size = int(self._env.lidar_num_beams) + 5
-        self._goal_size = 2                            # (x, y)
-        self._state_dim = self._base_obs_size + self._goal_size   # +2 for achieved (x, y)
+        # Goal size depends on goal_type:
+        #   position -> 2-D target (x, y); achieved is current (x, y).
+        #   distance -> 1-D target (always 0); achieved is current dist scalar.
+        self._goal_size = 2 if goal_type == "position" else 1
+        self._state_dim = self._base_obs_size + self._goal_size
         self._observation_size = self._state_dim + self._goal_size
         self._action_size = 2                          # continuous: [v, omega]
 
-        # achieved_goal = obs[..., goal_indices]; we put pos_xy at the end of the
-        # state portion, just before target_goal.
-        self._goal_indices = (
-            self._base_obs_size,
-            self._base_obs_size + 1,
+        # achieved_goal lives at the tail of the state portion of obs.
+        self._goal_indices = tuple(
+            self._base_obs_size + i for i in range(self._goal_size)
         )
 
         self._max_steps = int(self._env.max_steps)
@@ -115,11 +129,20 @@ class JaxNavSingleAgent(Env):
 
     # --- Core ---------------------------------------------------------------
     def _compose_obs(self, agents_view_dict, env_state) -> jnp.ndarray:
-        """Build the flat 1-D obs vector: [agents_view | pos_xy | goal_xy]."""
+        """Build the flat 1-D obs vector.
+
+        position mode: [agents_view | pos_xy(2) | goal_xy(2)]      → 209-D
+        distance mode: [agents_view | cur_dist(1) | zero(1)]       → 207-D
+        """
         agents_view = agents_view_dict["agent_0"]      # (205,)
-        pos = env_state.pos[0, :2]                     # (2,)  current x,y
-        goal = env_state.goal[0]                       # (2,)  target x,y
-        return jnp.concatenate([agents_view, pos, goal])
+        if self._goal_type == "position":
+            achieved = env_state.pos[0, :2]            # (2,)
+            target = env_state.goal[0]                 # (2,)
+        else:  # distance
+            cur_dist = jnp.linalg.norm(env_state.goal[0] - env_state.pos[0, :2])
+            achieved = cur_dist[None]                  # (1,)
+            target = jnp.zeros((1,), dtype=achieved.dtype)
+        return jnp.concatenate([agents_view, achieved, target])
 
     def reset(self, rng: jnp.ndarray) -> BraxState:
         rng, reset_key = jax.random.split(rng)

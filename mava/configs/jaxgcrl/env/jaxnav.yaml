@@ -2,12 +2,18 @@
 #
 # Requires `jaxmarl` to be installed:  uv sync --extra jaxnav
 #
-# Goal: navigate the agent to a target (x, y) in a 2-D LIDAR maze.
+# Goal: navigate the agent to a target in a 2-D LIDAR maze.
 #       num_agents=1 is forced by the adapter — multi-agent is out of scope here.
 #
-# Obs layout produced by mava/jaxgcrl/envs/jaxnav_adapter.py:
-#   [ agents_view (lidar+vel+goal_dist+goal_orient+λ, default 205) | pos_xy(2) | goal_xy(2) ]
-#   total = 209-D
+# goal_type controls how the goal is presented to HER + the contrastive critic:
+#   position (default) — target=(goal_x, goal_y), achieved=(pos_x, pos_y).
+#                        2-D goal that varies per episode. Richer signal.
+#                        Obs layout: [agents_view(205) | pos_xy(2) | goal_xy(2)] = 209-D
+#   distance           — target=0 (constant scalar "be at the goal"),
+#                        achieved=Euclidean distance to target.
+#                        1-D goal, smaller goal space, matches Mava's JaxNav default.
+#                        Obs layout: [agents_view(205) | cur_dist(1) | 0(1)] = 207-D
 env_name: jaxnav
 backend: null      # not used by jaxmarl envs but kept for API compat
 eval_env: null
+goal_type: position
