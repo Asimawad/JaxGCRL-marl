@@ -104,11 +104,19 @@ cppo-pure-ppo          base branch with all the work pre-jaxnav
 **Last commit on `cppo-pure-ppo`**: `02a4899` — "Restore Mava-style sweep
 defaults in cppo.yaml and crl.yaml" (or a later metrics-fix commit).
 
-**Last commit on `jaxnav-adapter`**: `0770f4e` — "JaxNav adapter: put success
-in state.metrics so the evaluator picks it up".
+**Last commit on `jaxnav-adapter`**: `a50f6b5` — "JaxNav adapter: add
+distance-based goal mode (HER target = 0)". Adds `goal_type` (position |
+distance) to `mava/configs/jaxgcrl/env/jaxnav.yaml`; default stays `position`.
 
-When resuming, `git fetch origin` and check `git log --oneline -10` to see the
-real tip.
+When resuming, **first check `git remote -v`** — sandbox refreshes lose the
+remote. If it's missing, re-add it (the URL is `JaxGCRL-marl`, NOT `jaxgcrl`):
+
+```
+git remote add origin https://github.com/Asimawad/JaxGCRL-marl.git
+git fetch origin
+```
+
+Then `git log --oneline -10` to see the real tip.
 
 ## 5. The recipe that produced 0.598 → 0.623 on Ant
 
@@ -293,9 +301,10 @@ every `uv sync` because pip reinstalls clobber the patch.
 
 ## 10. Compromised credentials (still valid as of session end)
 
-Two GitHub PATs and two wandb keys leaked into the conversation transcript
-(`context.zip` contains all of them verbatim). **Tell the user once** then
-move on:
+Three GitHub PATs and two wandb keys leaked into the conversation transcript
+(`context.zip` contains all of them verbatim — plus the third PAT was pasted
+again on 2026-04-28 when the user wanted to push and there was no auth set
+up). **Tell the user once** then move on:
 
 - Revoke any GitHub PATs from this session:
   https://github.com/settings/tokens
@@ -315,7 +324,14 @@ just don't put it in the public history.
   in the chat transcript for the exact pattern. The scan is a hard gate: if it
   fails, fix the file and re-stage rather than overriding.
 - **Never `git push` automatically.** Pattern: re-add remote with token, push,
-  remove remote. The token isn't sitting in `.git/config`.
+  remove remote. The token isn't sitting in `.git/config`. The repo URL is
+  `https://github.com/Asimawad/JaxGCRL-marl.git` (capitals — the lowercase
+  `jaxgcrl` 404s and ate ~10min last session).
+- **Never paste a PAT in chat.** It goes into `context.zip` verbatim. Drop it
+  in `/tmp/pat` (chmod 600), or use `gh auth login`. If the user pastes one
+  anyway, push with it as a one-shot URL `https://Asimawad:<PAT>@github.com/...`
+  (don't `git remote set-url` it — the token persists in `.git/config`), then
+  immediately tell them to revoke at https://github.com/settings/tokens.
 - **Don't introduce backwards-compat shims** for removed dataclass fields. If
   a field is dead, delete it and let the next config dump look cleaner.
 - **One bug fix per commit when possible.** The user reads `git log` to
@@ -329,7 +345,7 @@ just don't put it in the public history.
 |---|---|---|
 | **Push past 0.65 on Ant** | hit 0.623 at 80M | run 200M with same recipe; or try `h_dim=1024` |
 | **Run all 6 base envs with the recipe** | scripts exist; `run_cppo_*.sh` per env | execute on cluster, collect json |
-| **JaxNav numbers** | adapter works, untested at scale | full run from `jaxnav-adapter` branch |
+| **JaxNav numbers** | adapter works (position + distance goal modes), untested at scale | full run from `jaxnav-adapter` branch; pick `goal_type` per experiment |
 | **Ablate CPPO heuristics** | known load-bearing list in §5; sweep template at `search_space/cppo.yaml` | one knob at a time, n_trials≥50 |
 | **Real "absolute metric" eval** | currently reuses last eval; should be separate higher-precision re-eval | track best params during training, re-eval with bigger num_eval_envs at end |
 | **Drop dead dataclass fields** | `unroll_length`, `train_step_multiplier` are 0-ref | delete from `CPPO` dataclass |
