@@ -48,7 +48,7 @@ def _make_progress_fn(logger: MavaLogger):
     and `training/*` keys. We split them and dispatch to LogEvent.EVAL and
     LogEvent.TRAIN respectively (and `timestep` to LogEvent.MISC).
     """
-    state = {"eval_idx": 0, "last_metrics": {}}
+    state = {"eval_idx": 0, "last_metrics": {}, "last_step": 0}
 
     def progress_fn(num_steps, metrics, make_policy=None, params=None, env=None, do_render=False):  # noqa: ARG001
         eval_only = {}
@@ -67,6 +67,7 @@ def _make_progress_fn(logger: MavaLogger):
         if eval_only:
             logger.log(eval_only, int(num_steps), state["eval_idx"], LogEvent.EVAL)
             state["last_metrics"] = dict(eval_only)
+            state["last_step"] = int(num_steps)
         state["eval_idx"] += 1
 
     return progress_fn, state
@@ -113,6 +114,20 @@ def run_experiment(cfg: DictConfig) -> float:
         eval_env=eval_env,
         progress_fn=progress_fn,
     )
+
+    # -------- Absolute metric --------
+    # Re-emit the LAST eval metrics as a LogEvent.ABSOLUTE event. This populates
+    # the marl-eval `absolute_metrics` block in metrics.json (a "final headline"
+    # number per (env, algo, seed) used by rliable / sample-efficiency plotters).
+    # Note: this is the simple version — it copies the last eval values rather
+    # than running a separate higher-precision re-eval.
+    if progress_state["last_metrics"]:
+        logger.log(
+            progress_state["last_metrics"],
+            progress_state["last_step"],
+            progress_state["eval_idx"],
+            LogEvent.ABSOLUTE,
+        )
 
     logger.stop()
 

@@ -48,11 +48,12 @@ loggers:
     # the values on the right are what gets written to metrics.json.
     #
     # `episode_success_any` is the JaxGCRL-paper success metric (0–1 fraction
-    # of episodes where the goal was reached). It's the headline number — keep
-    # the `_any` in the JSON key so it's not confused with `episode_success`
-    # (which is the per-episode count of in-goal steps, a different scale).
+    # of episodes where the goal was reached at any step). It's the headline
+    # number from Figure 3 of Bortkiewicz et al.; we expose it as `success_rate`.
+    # Note: SMAX `win_rate` is 0–100 (percent); ours is 0–1 (fraction). Don't
+    # mix scales when plotting across projects.
     metrics_to_log:
-      episode_success_any: mean_episode_success_any
+      episode_success_any: success_rate
       episode_reward: mean_episode_return
       sps: steps_per_second
       avg_episode_length: mean_episode_length
