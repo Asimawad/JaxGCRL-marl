@@ -1,0 +1,67 @@
+# CPPO agent hyperparameters.
+#
+# Mirror the `CPPO` dataclass at `mava/jaxgcrl/agents/cppo/cppo.py` lines 71-138.
+# Defaults are the recipe that produced 0.598 peak on JaxGCRL Ant in 50M steps
+# (the JaxGCRL-aligned config: norm energy, contrastive temperature 1.0,
+# log_std_max=2, no adaptive entropy).
+
+# Optimization
+actor_lr: 3e-4
+q_lr: 3e-4
+max_grad_norm: 1.0
+lr_linear_decay: false
+lr_end: 1e-7
+
+# Rollout / batching
+rollout_length: 128
+unroll_length: 128
+num_epochs: 8
+batch_size: 256
+
+# PPO
+discounting: 0.9999
+clip_eps: 0.15
+ent_coef: 1e-4
+ent_coef_end: 1e-4
+ent_schedule_horizon: null
+
+# MC V(s,g) estimate
+num_mc_samples: 32
+mc_std_floor: 0.0
+
+# Contrastive critic (CRL)
+logsumexp_penalty_coeff: 0.1
+repr_dim: 64
+contrastive_loss_fn: fwd_infonce
+energy_fn: norm
+contrastive_temperature: 1.0
+
+# Network (shared across actor + sa-encoder + goal-encoder)
+h_dim: 512
+n_hidden: 4
+use_layer_norm: true
+use_relu: false
+skip_connections: 4
+log_std_min: -5.0
+log_std_max: 2.0
+
+# Goal handling
+use_achieved_goal: true
+terminate_on_success: true
+sa_state_mode: state_only
+actor_input_mode: obs_full_ach
+
+# Per-actor overrides (null = inherit from the shared flags above)
+actor_use_relu: null
+actor_use_layer_norm: null
+actor_skip_connections: null
+
+# Adaptive entropy (SAC-style) — disabled by default
+use_adaptive_entropy: false
+target_entropy: 2.0
+alpha_lr: 3e-4
+log_alpha_clip_min: 0.003
+log_alpha_clip_max: 0.05
+
+# Bookkeeping
+train_step_multiplier: 1

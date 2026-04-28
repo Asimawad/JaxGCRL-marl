@@ -1,0 +1,64 @@
+# Logger config for the mava-hosted JaxGCRL agents.
+#
+# Console is always on; Wandb is on by default and pulls run metadata from
+# the top-level `run.*` block. Neptune / Tensorboard / JSON are disabled by
+# default (the JaxGCRL port doesn't reference Mava's MarlEnv-only metadata
+# fields like `${env.scenario.task_name}`, so we keep them off to avoid
+# missing-key resolution errors).
+
+base_exp_path: results/
+
+loggers:
+  console:
+    _target_: mava.utils.logger.ConsoleLogger
+    enabled: True
+
+  wandb:
+    _target_: mava.utils.logger.WandbLogger
+    enabled: ${run.log_wandb}
+    project: ${run.wandb_project_name}
+    entity: ~
+    group: ${run.wandb_group}
+    run_name: ${run.exp_name}
+    tags: []
+    detailed_logging: False
+    run_id: ~
+
+  neptune:
+    _target_: mava.utils.logger.NeptuneLogger
+    enabled: False
+    project: ~
+    tag: []
+    group_tag: []
+    detailed_logging: False
+    architecture_name: jaxgcrl_anakin
+    upload_json_data: False
+    run_id: ~
+
+  json:
+    _target_: mava.utils.logger.JsonLogger
+    enabled: False
+    path: ~
+    task_name: ${env.env_name}
+    env_name: ${env.env_name}
+    seed: ${run.seed}
+
+  tensorboard:
+    _target_: mava.utils.logger.TensorboardLogger
+    enabled: False
+
+# Mava's checkpointing block — disabled by default. The JaxGCRL agents don't
+# use Orbax; if you need checkpoints, the original `brax.io.model.save_params`
+# path is still callable from `train_fn`.
+checkpointing:
+  save_model: False
+  save_args:
+    save_interval_steps: 1
+    max_to_keep: 1
+    keep_period: ~
+    checkpoint_uid: ~
+    rel_dir: checkpoints
+  load_model: False
+  load_args:
+    checkpoint_uid: ""
+    rel_dir: checkpoints

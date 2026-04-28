@@ -1,0 +1,55 @@
+# Top-level config for the mava-hosted JaxGCRL CPPO agent.
+#
+# Run via:
+#   python -m mava.jaxgcrl.run                         # uses defaults below
+#   python -m mava.jaxgcrl.run env=humanoid            # swap env
+#   python -m mava.jaxgcrl.run system.actor_lr=1e-4    # override hyperparam
+#   python -m mava.jaxgcrl.run -m system.actor_lr=1e-4,3e-4,1e-3   # multirun
+
+defaults:
+  - logger: logger
+  - system: cppo
+  - env: ant
+  - _self_
+  # For sweeps, opt in on the CLI:
+  #   python -m mava.jaxgcrl.run -m \
+  #       'hydra/sweeper=optuna' \
+  #       '+search_space@hydra.sweeper.params=cppo' \
+  #       hydra.sweeper.n_trials=20
+
+# Which agent class `mava/jaxgcrl/run.py` should construct.
+# Must be one of: cppo, crl. Determines which `system/*.yaml` is valid.
+agent: cppo
+
+# Run-level args fed to the agent's `train_fn(config: RunConfig, ...)`.
+# These mirror `mava.jaxgcrl.utils.config.RunConfig` field names.
+run:
+  seed: 0
+  total_env_steps: 50_000_000
+  num_envs: 512
+  num_eval_envs: 512
+  episode_length: 1001
+  num_evals: 30
+  action_repeat: 1
+  cuda: true
+  max_devices_per_host: 1
+
+  # Experiment naming + wandb (consumed by MavaLogger via the logger config below).
+  exp_name: cppo_${env.env_name}_seed${run.seed}_${now:%Y-%m-%d}
+  log_wandb: true
+  wandb_project_name: cppo-brax
+  wandb_group: cppo-${env.env_name}-${now:%Y-%m-%d}
+  wandb_mode: online
+
+  visualization_interval: 5
+  vis_length: 1000
+  checkpoint_logdir: null
+
+# Sweep example (run on CLI, not stored here, since these keys only exist
+# when hydra/sweeper=optuna is selected):
+#   python -m mava.jaxgcrl.run -m \
+#       'hydra/sweeper=optuna' \
+#       '+search_space@hydra.sweeper.params=cppo' \
+#       hydra.sweeper.direction=maximize \
+#       hydra.sweeper.n_trials=20 \
+#       hydra.sweeper.sampler.seed=42

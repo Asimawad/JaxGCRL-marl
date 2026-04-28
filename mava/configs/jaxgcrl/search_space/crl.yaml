@@ -1,0 +1,6 @@
+# Optuna sweep ranges for CRL — see search_space/cppo.yaml for usage.
+
+system.policy_lr: tag(log, interval(1e-5, 1e-3))
+system.critic_lr: tag(log, interval(1e-5, 1e-3))
+system.discounting: interval(0.95, 0.999)
+system.h_dim: choice(128, 256, 512)

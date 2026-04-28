@@ -16,6 +16,8 @@ env/
 wandb/
 runs/
 logs/
+outputs/
+multirun/
 *.log
 checkpoints/
 
@@ -24,8 +26,14 @@ cppo.zip
 *.tar.gz
 *.zip
 
-# --- Mava clones / vendored code (kept locally for reference, not pushed) ---
-mava/
+# --- Mava: ignore the vendored tree at the top level, EXCEPT our jaxgcrl port.
+# Use `mava/*` (not `mava/`) so git still descends and the !rules below apply. ---
+mava/*
+!mava/jaxgcrl/
+!mava/configs/
+# mava/configs/ exists but only the jaxgcrl subdir is ours.
+mava/configs/*
+!mava/configs/jaxgcrl/
 cppo-code/
 
 # --- Dev artefacts that snuck into the work area ---

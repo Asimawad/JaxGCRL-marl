@@ -1,0 +1,13 @@
+# Optuna sweep ranges for CPPO — values use hydra-optuna-sweeper override
+# syntax (`tag(log, interval(...))`, `choice(...)`), NOT optuna's distribution
+# schema. Activated via:
+#   python -m mava.jaxgcrl.run -m \
+#       'hydra/sweeper=optuna' \
+#       '+search_space@hydra.sweeper.params=cppo'
+
+system.actor_lr: tag(log, interval(1e-5, 1e-3))
+system.q_lr: tag(log, interval(1e-5, 1e-3))
+system.clip_eps: interval(0.1, 0.3)
+system.ent_coef: tag(log, interval(1e-5, 1e-2))
+system.h_dim: choice(256, 512, 1024)
+system.n_hidden: choice(2, 4, 6)

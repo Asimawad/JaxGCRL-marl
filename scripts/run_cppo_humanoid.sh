@@ -11,7 +11,7 @@ GROUP="cppo-humanoid-${DATE}"
 WANDB_PROJECT=${WANDB_PROJECT:-cppo-brax}
 
 SEEDS=${SEEDS:-"0"}
-STEPS=${STEPS:-100000000}
+STEPS=${STEPS:-50000000}
 NUM_ENVS=${NUM_ENVS:-512}
 NUM_MC=${NUM_MC:-32}
 
@@ -50,7 +50,7 @@ for SEED in $SEEDS; do
         --logsumexp-penalty-coeff=0.1 \
         --log-std-min=-5.0 \
         --log-std-max=2.0 \
-        --h-dim=512 \
+        --h-dim=1024 \
         --n-hidden=4 \
         --use-layer-norm \
         --skip-connections=4 \
