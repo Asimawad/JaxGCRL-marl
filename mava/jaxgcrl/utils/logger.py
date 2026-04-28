@@ -78,11 +78,21 @@ class _ConsoleLogger:
 
     def __init__(self) -> None:
         self.logger = logging.getLogger()
-        # Don't clobber any existing handlers (e.g. hydra's file handler).
-        if not any(
-            isinstance(h, logging.StreamHandler) and getattr(h, "_jaxgcrl_console", False)
-            for h in self.logger.handlers
-        ):
+
+        # Hydra also installs a StreamHandler on the root logger when @hydra.main
+        # runs — that's the `[YYYY-MM-DD HH:MM:SS][root][INFO] - …` line you see.
+        # If we add ours alongside, every record prints twice. Strip any existing
+        # StreamHandlers (but keep FileHandlers so hydra's per-run log file still
+        # gets written) and install our coloured one as the sole console output.
+        kept = []
+        for h in self.logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                kept.append(h)
+            elif isinstance(h, logging.StreamHandler) and getattr(h, "_jaxgcrl_console", False):
+                kept.append(h)  # already ours, idempotent on re-init
+        self.logger.handlers = kept
+
+        if not any(getattr(h, "_jaxgcrl_console", False) for h in self.logger.handlers):
             ch = logging.StreamHandler()
             ch._jaxgcrl_console = True  # type: ignore[attr-defined]
             ch.setFormatter(logging.Formatter(f"{Fore.CYAN}{Style.BRIGHT}%(message)s{Style.RESET_ALL}", "%H:%M:%S"))
