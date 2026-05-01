@@ -254,8 +254,9 @@ class MetricsRecorder:
 
     def print_progress(self):
         for idx, (key, y_values) in enumerate(self.y_data.items()):
-            logging.info(
-                f"step: {self.x_data[-1]}, {key}: {y_values[-1]:.3f} +/- {self.y_data_err[key][-1]:.3f}"
+            print(
+                f"step: {self.x_data[-1]}, {key}: {y_values[-1]:.3f} +/- {self.y_data_err[key][-1]:.3f}",
+                flush=True,
             )
 
     def print_times(self):
