@@ -1,6 +1,7 @@
 # PPO-CRL system config for Jumanji Sokoban.
-# Goal: scalar distance score = 1 - sum(min_manhattan_dist_box_to_target) / 8.0
-# ~0.5 at start, 1.0 when all boxes on targets. Continuous signal at every step.
+# Goal: 4D sorted agent-to-box proximity scores.
+# Changes at every agent step → dense InfoNCE signal; task-relevant (approach boxes).
+# ~10,000 distinct goal combos → eliminates InfoNCE false negatives.
 
 use_icrl: true
 
