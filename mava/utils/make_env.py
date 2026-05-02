@@ -725,7 +725,7 @@ def make_jumanji_sokoban_crl_env(
     num_rows = config.env.get("num_rows", 10)
     num_cols = config.env.get("num_cols", 10)
     time_limit = config.env.get("time_limit", 120)
-    goal_dim = 1  # 1 - normalized sum of min-distances from boxes to targets
+    goal_dim = 1  # 1D distance score: best working design for Sokoban
     use_icrl = config.system.get("use_icrl", False)
 
     if use_icrl:
@@ -767,7 +767,7 @@ def make_jumanji_sudoku_crl_env(
     from mava.wrappers.jumanji_sudoku_crl_wrapper import JumanjiSudokuCRLWrapper
 
     time_limit = config.env.get("time_limit", 100)
-    goal_dim = 1  # normalised fill fraction scalar
+    goal_dim = 9  # per-row correct-fraction (2^9=512 distinct combos)
     use_icrl = config.system.get("use_icrl", False)
 
     if use_icrl:
