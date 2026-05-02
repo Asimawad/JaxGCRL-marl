@@ -22,13 +22,16 @@ Jumanji Sudoku board encoding:
   -1  = empty cell (to be filled)
   0-8 = digit placed (0-indexed, i.e. digit d+1 in standard Sudoku)
 
-Goal (scalar, goal_dim=1):
-  achieved_goal: fraction of all 81 cells matching the known solution
-                 = (board == solution).mean()  ∈ [given_frac, 1.0]
-  ultimate_goal: 1.0  (all cells correct)
+Goal (9D, goal_dim=9):
+  achieved_goal: per-row fraction of cells matching the known solution
+                 row_i = (board[i] == solution[i]).mean()  ∈ [0, 1]  for each of 9 rows
+  ultimate_goal: [1.0, ..., 1.0]  (all rows fully correct)
 
-HER relabels future achieved_goal values: the curriculum naturally progresses
-from nearly-correct (high given_frac baseline) toward fully-correct (1.0).
+9D goal gives 2^9=512 distinct bit-patterns (fully-correct/not per row),
+dramatically reducing InfoNCE false negatives vs the 1D scalar (~10 values).
+
+HER relabels future achieved_goal values per row; the curriculum naturally
+progresses from nearly-correct (high given_frac baseline) toward fully-correct.
 
 Compatible with AutoResetWrapper and RecordEpisodeMetrics.
 """
@@ -99,15 +102,17 @@ class JumanjiSudokuCRLState:
 
 
 class JumanjiSudokuCRLWrapper:
-    """CRL wrapper for Jumanji Sudoku with correct-fraction goal.
+    """CRL wrapper for Jumanji Sudoku with per-row correct-fraction goal.
 
     Observation fields:
         agents_view  : (1, 81)   board values normalised by 8 (range [-0.125, 1])
         action_mask  : (1, 729)  flattened (9,9,9) action mask
         step_count   : (1,)
-        achieved_goal: (1, 1)    (board == solution).mean() ∈ [given_frac, 1.0]
-        ultimate_goal: (1, 1)    1.0
+        achieved_goal: (1, 9)    per-row (board[i]==solution[i]).mean(), 2^9=512 distinct combos
+        ultimate_goal: (1, 9)    [1.0, ..., 1.0]
     """
+
+    _GOAL_DIM = 9
 
     def __init__(self, time_limit: int = 100):
         self._time_limit = time_limit
@@ -131,9 +136,9 @@ class JumanjiSudokuCRLWrapper:
         )
 
     @staticmethod
-    def _correct_fraction(board: chex.Array, solution: chex.Array) -> chex.Array:
-        """Fraction of all 81 cells whose current value matches the solution."""
-        return jnp.mean((board == solution).astype(jnp.float32))
+    def _row_correct_fractions(board: chex.Array, solution: chex.Array) -> chex.Array:
+        """Per-row fraction of cells matching the solution. Shape (9,)."""
+        return jnp.mean((board == solution).astype(jnp.float32), axis=1)
 
     def _make_observation(
         self,
@@ -145,9 +150,9 @@ class JumanjiSudokuCRLWrapper:
         agents_view = (board.astype(jnp.float32) / 8.0).reshape(1, -1)  # (1, 81)
         flat_action_mask = action_mask.reshape(1, _ACTION_DIM).astype(jnp.bool_)
 
-        frac = self._correct_fraction(board, solution)
-        achieved_goal = jnp.array([[frac]], dtype=jnp.float32)   # (1, 1)
-        ultimate_goal = jnp.ones((1, 1), dtype=jnp.float32)      # (1, 1)
+        row_fracs = self._row_correct_fractions(board, solution)         # (9,)
+        achieved_goal = row_fracs.reshape(1, self._GOAL_DIM).astype(jnp.float32)  # (1, 9)
+        ultimate_goal = jnp.ones((1, self._GOAL_DIM), dtype=jnp.float32)          # (1, 9)
 
         return Observation(
             agents_view=agents_view,
@@ -287,14 +292,14 @@ class JumanjiSudokuCRLWrapper:
             name="step_count",
         )
         achieved_goal = specs.BoundedArray(
-            shape=(self.num_agents, 1),
+            shape=(self.num_agents, self._GOAL_DIM),
             dtype=jnp.float32,
             minimum=0.0,
             maximum=1.0,
             name="achieved_goal",
         )
         ultimate_goal = specs.BoundedArray(
-            shape=(self.num_agents, 1),
+            shape=(self.num_agents, self._GOAL_DIM),
             dtype=jnp.float32,
             minimum=0.0,
             maximum=1.0,
