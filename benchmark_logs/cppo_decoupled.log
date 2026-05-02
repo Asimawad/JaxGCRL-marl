@@ -1,0 +1,179 @@
+[36m[1m[33m[1mCONFIG[0m
+{
+│   'logger': {
+│   │   'base_exp_path': 'results/',
+│   │   'loggers': {
+│   │   │   'console': {
+│   │   │   │   '_target_': 'mava.utils.logger.ConsoleLogger',
+│   │   │   │   'enabled': True
+│   │   │   },
+│   │   │   'neptune': {
+│   │   │   │   '_target_': 'mava.utils.logger.NeptuneLogger',
+│   │   │   │   'enabled': False,
+│   │   │   │   'run_id': None,
+│   │   │   │   'project': 'Instadeep/mava-benchmark',
+│   │   │   │   'tag': ['delete'],
+│   │   │   │   'group_tag': ['delete'],
+│   │   │   │   'detailed_logging': False,
+│   │   │   │   'architecture_name': 'anakin',
+│   │   │   │   'upload_json_data': False
+│   │   │   },
+│   │   │   'json': {
+│   │   │   │   '_target_': 'mava.utils.logger.JsonLogger',
+│   │   │   │   'enabled': True,
+│   │   │   │   'path': None,
+│   │   │   │   'task_name': 'smacv2_5_units',
+│   │   │   │   'env_name': 'Smax',
+│   │   │   │   'seed': 42
+│   │   │   },
+│   │   │   'tensorboard': {
+│   │   │   │   '_target_': 'mava.utils.logger.TensorboardLogger',
+│   │   │   │   'enabled': False
+│   │   │   },
+│   │   │   'wandb': {
+│   │   │   │   '_target_': 'mava.utils.logger.WandbLogger',
+│   │   │   │   'enabled': False,
+│   │   │   │   'run_id': None,
+│   │   │   │   'project': 'ssued',
+│   │   │   │   'entity': 'asim_awad',
+│   │   │   │   'tags': ['delete'],
+│   │   │   │   'group': None,
+│   │   │   │   'run_name': None,
+│   │   │   │   'detailed_logging': False,
+│   │   │   │   'upload_json_data': True
+│   │   │   }
+│   │   },
+│   │   'checkpointing': {
+│   │   │   'save_model': False,
+│   │   │   'save_args': {
+│   │   │   │   'save_interval_steps': 1,
+│   │   │   │   'max_to_keep': 1,
+│   │   │   │   'keep_period': None,
+│   │   │   │   'checkpoint_uid': None,
+│   │   │   │   'rel_dir': 'checkpoints'
+│   │   │   },
+│   │   │   'load_model': False,
+│   │   │   'load_args': {'checkpoint_uid': '', 'rel_dir': 'checkpoints'}
+│   │   },
+│   │   'system_name': 'ppo_crl'
+│   },
+│   'arch': {
+│   │   'architecture_name': 'anakin',
+│   │   'num_envs': 256,
+│   │   'evaluation_greedy': False,
+│   │   'num_evaluation': 6,
+│   │   'num_eval_episodes': 16,
+│   │   'num_absolute_metric_eval_episodes': 8192,
+│   │   'absolute_metric': True
+│   },
+│   'system': {
+│   │   'use_icrl': True,
+│   │   'total_timesteps': 393216,
+│   │   'num_updates': 12,
+│   │   'seed': 42,
+│   │   'update_batch_size': 1,
+│   │   'add_agent_id': 0,
+│   │   'rollout_length': 128,
+│   │   'batch_size': 256,
+│   │   'ppo_epochs': 1,
+│   │   'clip_eps': 0.2,
+│   │   'ent_coef': 0.1,
+│   │   'q_lr': 0.00025,
+│   │   'actor_lr': 0.00025,
+│   │   'network_size': 512,
+│   │   'max_grad_norm': 0.5,
+│   │   'lr_decay_type': 'cosine',
+│   │   'lr_end': 1e-07,
+│   │   'gamma': 0.99,
+│   │   'logsumexp_penalty_coeff': 0.1,
+│   │   'rep_size': 64,
+│   │   'energy_fn': 'norm',
+│   │   'contrastive_loss_fn': 'fwd_infonce',
+│   │   'use_stochastic_generator': False,
+│   │   'deterministic_reset': False,
+│   │   'win_repeat_steps': 5,
+│   │   'icrl': {
+│   │   │   'goal_type': 'distance_per_agent',
+│   │   │   'base_obs_dim': 127,
+│   │   │   'goal_dim': 1
+│   │   },
+│   │   'actor_batch_size': 512,
+│   │   'num_agents': 5,
+│   │   'total_grad_steps': 11424,
+│   │   'num_minibatches': 635,
+│   │   'actor_total_grad_steps': 3804,
+│   │   'critic_total_grad_steps': 7620,
+│   │   'critic_batch_size': 256,
+│   │   'num_updates_per_eval': 2,
+│   │   'num_steps_per_evaluation_m': 0.065536
+│   },
+│   'network': {
+│   │   'sa_encoder_network': {
+│   │   │   'pre_torso': {
+│   │   │   │   '_target_': 'mava.networks.torsos.MLPTorso',
+│   │   │   │   'layer_sizes': [512, 512, 512, 512],
+│   │   │   │   'use_layer_norm': True,
+│   │   │   │   'activation': 'swish',
+│   │   │   │   'activate_final': True
+│   │   │   }
+│   │   },
+│   │   'goal_encoder_network': {
+│   │   │   'pre_torso': {
+│   │   │   │   '_target_': 'mava.networks.torsos.MLPTorso',
+│   │   │   │   'layer_sizes': [512, 512, 512, 512],
+│   │   │   │   'use_layer_norm': True,
+│   │   │   │   'activation': 'swish',
+│   │   │   │   'activate_final': True
+│   │   │   }
+│   │   },
+│   │   'actor_network': {
+│   │   │   'pre_torso': {
+│   │   │   │   '_target_': 'mava.networks.torsos.MLPTorso',
+│   │   │   │   'layer_sizes': [512, 512, 512, 512],
+│   │   │   │   'use_layer_norm': False,
+│   │   │   │   'activation': 'relu',
+│   │   │   │   'activate_final': False
+│   │   │   }
+│   │   }
+│   },
+│   'env': {
+│   │   'env_name': 'Smax',
+│   │   'scenario': {
+│   │   │   'name': 'HeuristicEnemySMAX',
+│   │   │   'task_name': 'smacv2_5_units'
+│   │   },
+│   │   'eval_metric': 'win_rate',
+│   │   'implicit_agent_id': False,
+│   │   'log_win_rate': True,
+│   │   'kwargs': {
+│   │   │   'see_enemy_actions': True,
+│   │   │   'walls_cause_death': True,
+│   │   │   'attack_mode': 'closest'
+│   │   }
+│   }
+}
+[36m[1m[33m[1mMISC - Timestep: 65536[0m
+[36m[1m[36m[1mACTOR - Compile seconds: 116.542 | Steps per second: 562.336 | Wall clock seconds: 116.542 | Win rate: 0.055 | Episode length mean: 33.510 | Episode length std: 12.726 | Episode length min: 5 | Episode length max: 101 | Episode return mean: 0.249 | Episode return std: 0.167 | Episode return min: 0.000 | Episode return max: 0.989[0m
+[36m[1m[35m[1mTRAINER - Actor loss: -0.088 | Categorical accuracy: 0.019 | Critic loss: 4.969 | Entropy: 0.970 | Logits neg: -6.857 | Logits pos: -4.972 | Logsumexp: -0.017 | Q mean: -4.972[0m
+[36m[1m[32m[1mEVALUATOR - Steps per second: 15.887 | Win rate: 0.000 | Episode length mean: 36.000 | Episode length std: 17.284 | Episode length min: 14 | Episode length max: 77 | Episode return mean: 0.223 | Episode return std: 0.155 | Episode return min: 0.000 | Episode return max: 0.567[0m
+[36m[1m[33m[1mMISC - Timestep: 131072[0m
+[36m[1m[36m[1mACTOR - Steps per second: 1149.034 | Wall clock seconds: 57.036 | Win rate: 0.472 | Episode length mean: 34.306 | Episode length std: 14.165 | Episode length min: 3 | Episode length max: 101 | Episode return mean: 0.300 | Episode return std: 0.201 | Episode return min: 0.000 | Episode return max: 0.995[0m
+[36m[1m[35m[1mTRAINER - Actor loss: -0.087 | Categorical accuracy: 0.026 | Critic loss: 4.655 | Entropy: 0.827 | Logits neg: -7.666 | Logits pos: -4.655 | Logsumexp: -0.012 | Q mean: -4.655[0m
+[36m[1m[32m[1mEVALUATOR - Steps per second: 17611.650 | Win rate: 0.000 | Episode length mean: 38.688 | Episode length std: 11.993 | Episode length min: 18 | Episode length max: 56 | Episode return mean: 0.271 | Episode return std: 0.171 | Episode return min: 0.045 | Episode return max: 0.629[0m
+[36m[1m[33m[1mMISC - Timestep: 196608[0m
+[36m[1m[36m[1mACTOR - Steps per second: 90817.812 | Wall clock seconds: 0.722 | Win rate: 0.098 | Episode length mean: 32.301 | Episode length std: 14.090 | Episode length min: 1 | Episode length max: 101 | Episode return mean: 0.373 | Episode return std: 0.220 | Episode return min: 0.000 | Episode return max: 0.994[0m
+[36m[1m[35m[1mTRAINER - Actor loss: -0.070 | Categorical accuracy: 0.029 | Critic loss: 4.482 | Entropy: 0.744 | Logits neg: -7.877 | Logits pos: -4.482 | Logsumexp: -0.008 | Q mean: -4.482[0m
+[36m[1m[32m[1mEVALUATOR - Steps per second: 20779.859 | Win rate: 0.000 | Episode length mean: 42.250 | Episode length std: 26.112 | Episode length min: 10 | Episode length max: 101 | Episode return mean: 0.398 | Episode return std: 0.249 | Episode return min: 0.069 | Episode return max: 0.932[0m
+[36m[1m[33m[1mMISC - Timestep: 262144[0m
+[36m[1m[36m[1mACTOR - Steps per second: 91131.882 | Wall clock seconds: 0.719 | Win rate: 0.051 | Episode length mean: 33.239 | Episode length std: 14.524 | Episode length min: 4 | Episode length max: 101 | Episode return mean: 0.441 | Episode return std: 0.228 | Episode return min: 0.000 | Episode return max: 0.992[0m
+[36m[1m[35m[1mTRAINER - Actor loss: -0.064 | Categorical accuracy: 0.030 | Critic loss: 4.417 | Entropy: 0.613 | Logits neg: -7.864 | Logits pos: -4.417 | Logsumexp: -0.006 | Q mean: -4.417[0m
+[36m[1m[32m[1mEVALUATOR - Steps per second: 16252.562 | Win rate: 0.000 | Episode length mean: 32.875 | Episode length std: 15.588 | Episode length min: 10 | Episode length max: 74 | Episode return mean: 0.396 | Episode return std: 0.241 | Episode return min: 0.007 | Episode return max: 0.866[0m
+[36m[1m[33m[1mMISC - Timestep: 327680[0m
+[36m[1m[36m[1mACTOR - Steps per second: 91028.277 | Wall clock seconds: 0.720 | Win rate: 1.073 | Episode length mean: 33.340 | Episode length std: 17.363 | Episode length min: 2 | Episode length max: 105 | Episode return mean: 0.466 | Episode return std: 0.253 | Episode return min: 0.000 | Episode return max: 0.998[0m
+[36m[1m[35m[1mTRAINER - Actor loss: -0.043 | Categorical accuracy: 0.031 | Critic loss: 4.314 | Entropy: 0.533 | Logits neg: -8.071 | Logits pos: -4.317 | Logsumexp: -0.010 | Q mean: -4.317[0m
+[36m[1m[32m[1mEVALUATOR - Steps per second: 15396.848 | Win rate: 0.000 | Episode length mean: 31.312 | Episode length std: 10.427 | Episode length min: 10 | Episode length max: 46 | Episode return mean: 0.443 | Episode return std: 0.168 | Episode return min: 0.114 | Episode return max: 0.763[0m
+[36m[1m[33m[1mMISC - Timestep: 393216[0m
+[36m[1m[36m[1mACTOR - Steps per second: 90842.933 | Wall clock seconds: 0.721 | Win rate: 3.036 | Episode length mean: 32.339 | Episode length std: 15.602 | Episode length min: 3 | Episode length max: 101 | Episode return mean: 0.447 | Episode return std: 0.259 | Episode return min: 0.000 | Episode return max: 0.998[0m
+[36m[1m[35m[1mTRAINER - Actor loss: -0.030 | Categorical accuracy: 0.030 | Critic loss: 4.325 | Entropy: 0.477 | Logits neg: -7.961 | Logits pos: -4.328 | Logsumexp: -0.008 | Q mean: -4.328[0m
+[36m[1m[32m[1mEVALUATOR - Steps per second: 14860.382 | Win rate: 0.000 | Episode length mean: 30.062 | Episode length std: 11.787 | Episode length min: 12 | Episode length max: 54 | Episode return mean: 0.341 | Episode return std: 0.200 | Episode return min: 0.051 | Episode return max: 0.747[0m
+[36m[1m[34m[1mABSOLUTE - Steps per second: 9240.714 | Win rate: 0.427 | Episode length mean: 33.792 | Episode length std: 18.227 | Episode length min: 2 | Episode length max: 101 | Episode return mean: 0.485 | Episode return std: 0.266 | Episode return min: 0.000 | Episode return max: 2.000[0m
