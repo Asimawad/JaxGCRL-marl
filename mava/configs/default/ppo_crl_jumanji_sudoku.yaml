@@ -11,8 +11,8 @@ hydra:
     - file://mava/configs
 
 arch:
-  num_envs: 64
-  num_eval_envs: 64
+  num_envs: 16
+  num_eval_envs: 16
   num_evaluation: 30
   eval_steps: 200
   evaluation_greedy: false
