@@ -1,0 +1,61 @@
+MISC - Timestep: 9961472.000
+EVALUATOR - Episode length: 81.335 | Episode return: 0.288 | Steps per second: 16094.458 | Win rate: 28.760
+MISC - Timestep: 19922944.000
+EVALUATOR - Episode length: 62.759 | Episode return: 0.409 | Steps per second: 41814.668 | Win rate: 40.918
+MISC - Timestep: 29884416.000
+EVALUATOR - Episode length: 59.748 | Episode return: 0.450 | Steps per second: 40037.352 | Win rate: 45.020
+MISC - Timestep: 39845888.000
+EVALUATOR - Episode length: 60.144 | Episode return: 0.452 | Steps per second: 39647.965 | Win rate: 45.215
+MISC - Timestep: 49807360.000
+EVALUATOR - Episode length: 56.399 | Episode return: 0.505 | Steps per second: 37673.129 | Win rate: 50.488
+MISC - Timestep: 59768832.000
+EVALUATOR - Episode length: 56.133 | Episode return: 0.500 | Steps per second: 37650.164 | Win rate: 50.049
+MISC - Timestep: 69730304.000
+EVALUATOR - Episode length: 54.542 | Episode return: 0.519 | Steps per second: 36796.102 | Win rate: 51.855
+MISC - Timestep: 79691776.000
+EVALUATOR - Episode length: 55.466 | Episode return: 0.517 | Steps per second: 37255.895 | Win rate: 51.709
+MISC - Timestep: 89653248.000
+EVALUATOR - Episode length: 51.908 | Episode return: 0.556 | Steps per second: 34922.293 | Win rate: 55.566
+MISC - Timestep: 99614720.000
+EVALUATOR - Episode length: 51.104 | Episode return: 0.562 | Steps per second: 34274.090 | Win rate: 56.152
+MISC - Timestep: 109576192.000
+EVALUATOR - Episode length: 50.773 | Episode return: 0.564 | Steps per second: 34066.773 | Win rate: 56.445
+MISC - Timestep: 119537664.000
+EVALUATOR - Episode length: 48.616 | Episode return: 0.587 | Steps per second: 32630.674 | Win rate: 58.740
+MISC - Timestep: 129499136.000
+EVALUATOR - Episode length: 46.863 | Episode return: 0.609 | Steps per second: 31295.338 | Win rate: 60.889
+MISC - Timestep: 139460608.000
+EVALUATOR - Episode length: 47.312 | Episode return: 0.603 | Steps per second: 31811.604 | Win rate: 60.254
+MISC - Timestep: 149422080.000
+EVALUATOR - Episode length: 45.056 | Episode return: 0.629 | Steps per second: 30201.656 | Win rate: 62.939
+MISC - Timestep: 159383552.000
+EVALUATOR - Episode length: 41.112 | Episode return: 0.668 | Steps per second: 27602.879 | Win rate: 66.846
+MISC - Timestep: 169345024.000
+EVALUATOR - Episode length: 42.227 | Episode return: 0.655 | Steps per second: 28415.756 | Win rate: 65.527
+MISC - Timestep: 179306496.000
+EVALUATOR - Episode length: 39.416 | Episode return: 0.688 | Steps per second: 26256.197 | Win rate: 68.799
+MISC - Timestep: 189267968.000
+EVALUATOR - Episode length: 40.934 | Episode return: 0.669 | Steps per second: 27087.264 | Win rate: 66.895
+MISC - Timestep: 199229440.000
+EVALUATOR - Episode length: 37.860 | Episode return: 0.706 | Steps per second: 25391.711 | Win rate: 70.605
+MISC - Timestep: 209190912.000
+EVALUATOR - Episode length: 38.163 | Episode return: 0.700 | Steps per second: 25443.570 | Win rate: 70.020
+MISC - Timestep: 219152384.000
+EVALUATOR - Episode length: 36.454 | Episode return: 0.719 | Steps per second: 24336.979 | Win rate: 71.924
+MISC - Timestep: 229113856.000
+EVALUATOR - Episode length: 35.687 | Episode return: 0.722 | Steps per second: 23833.998 | Win rate: 72.217
+MISC - Timestep: 239075328.000
+EVALUATOR - Episode length: 36.579 | Episode return: 0.716 | Steps per second: 24553.963 | Win rate: 71.631
+MISC - Timestep: 249036800.000
+EVALUATOR - Episode length: 34.078 | Episode return: 0.747 | Steps per second: 22799.031 | Win rate: 74.707
+MISC - Timestep: 258998272.000
+EVALUATOR - Episode length: 34.184 | Episode return: 0.746 | Steps per second: 22941.648 | Win rate: 74.561
+MISC - Timestep: 268959744.000
+EVALUATOR - Episode length: 32.182 | Episode return: 0.769 | Steps per second: 21571.514 | Win rate: 76.904
+MISC - Timestep: 278921216.000
+EVALUATOR - Episode length: 33.519 | Episode return: 0.751 | Steps per second: 22437.260 | Win rate: 75.146
+MISC - Timestep: 288882688.000
+EVALUATOR - Episode length: 31.259 | Episode return: 0.773 | Steps per second: 21024.281 | Win rate: 77.344
+MISC - Timestep: 298844160.000
+EVALUATOR - Episode length: 33.529 | Episode return: 0.750 | Steps per second: 22578.592 | Win rate: 75.000
+ABSOLUTE - Episode length: 32.763 | Episode return: 0.759 | Steps per second: 13466.966 | Win rate: 75.891
