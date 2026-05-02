@@ -1,0 +1,27 @@
+# Jumanji Maze CRL Environment Configuration
+# Single-agent maze navigation: reach the target cell.
+# Goal: normalised agent position → normalised target position.
+
+env_name: JumanjiMaze
+task_name: jumanji_maze
+
+scenario:
+  name: Maze-v0
+  task_name: jumanji_maze
+
+# Grid dimensions
+num_rows: 10
+num_cols: 10
+
+# Episode settings
+time_limit: 100
+
+# Single-agent environment
+num_agents: 1
+
+# Mava boilerplate
+eval_metric: win_rate
+implicit_agent_id: false
+log_win_rate: true
+
+kwargs: {}

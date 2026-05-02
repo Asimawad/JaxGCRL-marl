@@ -1,0 +1,61 @@
+MISC - Timestep: 4980736.000
+EVALUATOR - Episode length: 119.975 | Episode return: 0.001 | Prop correct boxes: 0.090 | Steps per second: 49004.094 | Win rate: 0.098
+MISC - Timestep: 9961472.000
+EVALUATOR - Episode length: 110.579 | Episode return: 0.154 | Prop correct boxes: 0.675 | Steps per second: 4103204.250 | Win rate: 15.430
+MISC - Timestep: 14942208.000
+EVALUATOR - Episode length: 99.183 | Episode return: 0.312 | Prop correct boxes: 0.795 | Steps per second: 3672518.000 | Win rate: 31.152
+MISC - Timestep: 19922944.000
+EVALUATOR - Episode length: 115.012 | Episode return: 0.076 | Prop correct boxes: 0.676 | Steps per second: 4261296.000 | Win rate: 7.617
+MISC - Timestep: 24903680.000
+EVALUATOR - Episode length: 111.838 | Episode return: 0.118 | Prop correct boxes: 0.738 | Steps per second: 4169492.250 | Win rate: 11.816
+MISC - Timestep: 29884416.000
+EVALUATOR - Episode length: 110.685 | Episode return: 0.154 | Prop correct boxes: 0.779 | Steps per second: 4155641.000 | Win rate: 15.430
+MISC - Timestep: 34865152.000
+EVALUATOR - Episode length: 108.608 | Episode return: 0.163 | Prop correct boxes: 0.751 | Steps per second: 4040061.500 | Win rate: 16.309
+MISC - Timestep: 39845888.000
+EVALUATOR - Episode length: 114.894 | Episode return: 0.097 | Prop correct boxes: 0.727 | Steps per second: 4290413.500 | Win rate: 9.668
+MISC - Timestep: 44826624.000
+EVALUATOR - Episode length: 100.899 | Episode return: 0.268 | Prop correct boxes: 0.793 | Steps per second: 3774499.250 | Win rate: 26.807
+MISC - Timestep: 49807360.000
+EVALUATOR - Episode length: 116.977 | Episode return: 0.040 | Prop correct boxes: 0.717 | Steps per second: 4354228.000 | Win rate: 4.004
+MISC - Timestep: 54788096.000
+EVALUATOR - Episode length: 112.376 | Episode return: 0.125 | Prop correct boxes: 0.758 | Steps per second: 4255920.000 | Win rate: 12.500
+MISC - Timestep: 59768832.000
+EVALUATOR - Episode length: 113.303 | Episode return: 0.098 | Prop correct boxes: 0.764 | Steps per second: 4197650.500 | Win rate: 9.766
+MISC - Timestep: 64749568.000
+EVALUATOR - Episode length: 107.838 | Episode return: 0.168 | Prop correct boxes: 0.777 | Steps per second: 3989030.000 | Win rate: 16.846
+MISC - Timestep: 69730304.000
+EVALUATOR - Episode length: 98.938 | Episode return: 0.297 | Prop correct boxes: 0.822 | Steps per second: 3657621.500 | Win rate: 29.736
+MISC - Timestep: 74711040.000
+EVALUATOR - Episode length: 102.659 | Episode return: 0.269 | Prop correct boxes: 0.786 | Steps per second: 3863259.500 | Win rate: 26.904
+MISC - Timestep: 79691776.000
+EVALUATOR - Episode length: 114.301 | Episode return: 0.096 | Prop correct boxes: 0.766 | Steps per second: 4217093.000 | Win rate: 9.570
+MISC - Timestep: 84672512.000
+EVALUATOR - Episode length: 114.232 | Episode return: 0.099 | Prop correct boxes: 0.745 | Steps per second: 4256233.000 | Win rate: 9.912
+MISC - Timestep: 89653248.000
+EVALUATOR - Episode length: 82.005 | Episode return: 0.479 | Prop correct boxes: 0.864 | Steps per second: 3075504.500 | Win rate: 47.852
+MISC - Timestep: 94633984.000
+EVALUATOR - Episode length: 102.773 | Episode return: 0.240 | Prop correct boxes: 0.808 | Steps per second: 3813726.750 | Win rate: 24.023
+MISC - Timestep: 99614720.000
+EVALUATOR - Episode length: 89.447 | Episode return: 0.401 | Prop correct boxes: 0.843 | Steps per second: 3367749.500 | Win rate: 40.137
+MISC - Timestep: 104595456.000
+EVALUATOR - Episode length: 115.039 | Episode return: 0.094 | Prop correct boxes: 0.758 | Steps per second: 4271835.500 | Win rate: 9.375
+MISC - Timestep: 109576192.000
+EVALUATOR - Episode length: 98.170 | Episode return: 0.272 | Prop correct boxes: 0.816 | Steps per second: 3636554.000 | Win rate: 27.197
+MISC - Timestep: 114556928.000
+EVALUATOR - Episode length: 103.527 | Episode return: 0.259 | Prop correct boxes: 0.815 | Steps per second: 3869065.500 | Win rate: 25.928
+MISC - Timestep: 119537664.000
+EVALUATOR - Episode length: 94.146 | Episode return: 0.372 | Prop correct boxes: 0.841 | Steps per second: 3477338.500 | Win rate: 37.158
+MISC - Timestep: 124518400.000
+EVALUATOR - Episode length: 105.657 | Episode return: 0.228 | Prop correct boxes: 0.806 | Steps per second: 3970846.000 | Win rate: 22.754
+MISC - Timestep: 129499136.000
+EVALUATOR - Episode length: 104.369 | Episode return: 0.229 | Prop correct boxes: 0.805 | Steps per second: 3874749.500 | Win rate: 22.949
+MISC - Timestep: 134479872.000
+EVALUATOR - Episode length: 108.929 | Episode return: 0.162 | Prop correct boxes: 0.789 | Steps per second: 4067530.000 | Win rate: 16.162
+MISC - Timestep: 139460608.000
+EVALUATOR - Episode length: 112.879 | Episode return: 0.103 | Prop correct boxes: 0.769 | Steps per second: 4236101.000 | Win rate: 10.254
+MISC - Timestep: 144441344.000
+EVALUATOR - Episode length: 104.958 | Episode return: 0.244 | Prop correct boxes: 0.807 | Steps per second: 3950877.000 | Win rate: 24.414
+MISC - Timestep: 149422080.000
+EVALUATOR - Episode length: 107.484 | Episode return: 0.202 | Prop correct boxes: 0.799 | Steps per second: 4030996.250 | Win rate: 20.166
+ABSOLUTE - Episode length: 78.724 | Episode return: 0.506 | Prop correct boxes: 0.871 | Steps per second: 123711.109 | Win rate: 50.647

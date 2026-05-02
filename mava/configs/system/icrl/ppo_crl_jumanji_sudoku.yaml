@@ -1,0 +1,34 @@
+# PPO-CRL system config for Jumanji Sudoku.
+# Goal: normalised fill fraction (scalar, goal_dim=1).
+
+use_icrl: true
+
+total_timesteps: ~
+num_updates: 4576
+seed: 42
+update_batch_size: 1
+add_agent_id: false
+
+rollout_length: 128
+batch_size: 512
+ppo_epochs: 1
+clip_eps: 0.2
+ent_coef: 0.05
+
+actor_lr: 2.5e-4
+q_lr: 2.5e-4
+max_grad_norm: 0.5
+lr_decay_type: cosine
+lr_end: 1e-7
+
+gamma: 0.99
+logsumexp_penalty_coeff: 0.1
+rep_size: 128
+energy_fn: norm
+contrastive_loss_fn: fwd_infonce
+win_repeat_steps: 5
+deterministic_reset: false
+
+icrl:
+  goal_type: distance
+  goal_dim: 1

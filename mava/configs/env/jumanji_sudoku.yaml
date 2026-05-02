@@ -1,0 +1,24 @@
+# Jumanji Sudoku CRL Environment Configuration
+# Single-agent Sudoku solving: fill all empty cells correctly.
+# Action space: 9*9*9 = 729 (row * 81 + col * 9 + digit).
+# Goal: board completion fraction.
+
+env_name: JumanjiSudoku
+task_name: jumanji_sudoku
+
+scenario:
+  name: Sudoku-v0
+  task_name: jumanji_sudoku
+
+# Episode settings
+time_limit: 100
+
+# Single-agent environment
+num_agents: 1
+
+# Mava boilerplate
+eval_metric: win_rate
+implicit_agent_id: false
+log_win_rate: true
+
+kwargs: {}

@@ -1,0 +1,24 @@
+# Larger PPO-CRL network: 4 × 1024 hidden units (vs. 4 × 512 in ppo_crl.yaml).
+sa_encoder_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [1024, 1024, 1024, 1024]
+    use_layer_norm: true
+    activation: swish
+    activate_final: true
+
+goal_encoder_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [1024, 1024, 1024, 1024]
+    use_layer_norm: true
+    activation: swish
+    activate_final: true
+
+actor_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [1024, 1024, 1024, 1024]
+    use_layer_norm: true
+    activation: swish
+    activate_final: true

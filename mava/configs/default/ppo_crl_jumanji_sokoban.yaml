@@ -1,0 +1,23 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - env: jumanji_sokoban
+  - system: icrl/ppo_crl_jumanji_sokoban
+  - network: ppo_crl_large
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+
+arch:
+  num_envs: 512
+  num_eval_envs: 128
+  num_evaluation: 30
+  eval_steps: 200
+  evaluation_greedy: false
+
+logger:
+  loggers:
+    json:
+      task_name: ${env.env_name}
