@@ -1,10 +1,12 @@
 # PPO-CRL system config for Jumanji Sudoku.
-# Goal: normalised fill fraction (scalar, goal_dim=1).
+# Goal: per-row correct-fraction (9D), 2^9=512 distinct combos.
+# 18311 updates × 16 envs × 128 rollout = 37.5M steps.
+# num_envs=16 avoids OOM from vmap(729 actions) × N_samples × 1024 hidden.
 
 use_icrl: true
 
 total_timesteps: ~
-num_updates: 4576
+num_updates: 18311
 seed: 42
 update_batch_size: 1
 add_agent_id: false
@@ -31,4 +33,4 @@ deterministic_reset: false
 
 icrl:
   goal_type: distance
-  goal_dim: 1
+  goal_dim: 9
